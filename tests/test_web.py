@@ -457,5 +457,7 @@ def test_one_tiny_wanted_reference_keeps_a_low_score_unclear(tmp_path, monkeypat
 def test_runs_page_tolerates_odd_gem_rates(env):
     _, db, client = env
     db.put("gem_rates", {"FMA": "0.77", "EVA": None})
+    db.put("defaults", {"psa_1star_max": "80", "raw_1star_max": None})
     page = client.get("/ops")
     assert page.status_code == 200 and "FMA 77%" in page.text and "EVA not set" in page.text
+    assert "PSA 10 $80.00" in page.text

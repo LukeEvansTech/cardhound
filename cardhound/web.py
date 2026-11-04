@@ -25,7 +25,13 @@ RATING_ORDER = {"great": 0, "good": 1, "unknown": 2, "fair": 3, "high": 4}
 
 
 def money(v) -> str:
-    return "" if v is None else f"${v:,.2f}" if v < 100 else f"${v:,.0f}"
+    try:  # imported settings may hold numeric strings
+        f = float(v)
+    except (TypeError, ValueError):
+        return ""
+    if not math.isfinite(f):
+        return ""
+    return f"${f:,.2f}" if f < 100 else f"${f:,.0f}"
 
 
 def star_label(star: str) -> str:
