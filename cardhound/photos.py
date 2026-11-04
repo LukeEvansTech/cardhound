@@ -96,9 +96,9 @@ def check(w: dict, key: str, src: str, refs_dir: Path, photos_dir: Path) -> dict
         photo.unlink(missing_ok=True)  # so the next sweep downloads it again
         return none
     verdict = "match" if best >= MATCH else "differs" if best < DIFFERS else "unclear"
-    if verdict == "differs" and all(small(r) for r in refs):
-        verdict = "unclear"  # a thumbnail-sized reference cannot prove a photo is different art
     skip = set(w.get("skip") or [])
+    if verdict == "differs" and any(small(r) for r in refs if r.name not in skip):
+        verdict = "unclear"  # missing a thumbnail-sized wanted art proves nothing
     if verdict == "match" and ref.name in skip:
         # 1★ and 2★ of one card share their art, so only call it unwanted when no kept art matches too.
         kept = max((sc for sc, r in scored if r.name not in skip), default=0)

@@ -437,3 +437,18 @@ def test_deal_page_shows_price_against_market(env, monkeypatch):
     assert "71% of market" in page and "sold median $1,000" in page
     assert "aria-current=page" in page
     assert "71% of market" in client.get("/").text
+
+
+def test_one_tiny_wanted_reference_keeps_a_low_score_unclear(tmp_path, monkeypatch):
+    refs, shots = tmp_path / "refs", tmp_path / "photos"
+    refs.mkdir()
+    shots.mkdir()
+    for n in ("tiny.png", "big.png"):
+        (refs / n).write_bytes(b"x")
+    monkeypatch.setattr(photos, "download", lambda src, dest: dest)
+    monkeypatch.setattr(photos, "score", lambda p, r: 3)
+    monkeypatch.setattr(photos, "small", lambda r: r.name == "tiny.png")
+    w = {"set": "DBS", "refs": ["tiny.png", "big.png"]}
+    assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "unclear"
+    w["skip"] = ["tiny.png"]  # unticked, so only the large art counts
+    assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "differs"

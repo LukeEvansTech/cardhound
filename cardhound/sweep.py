@@ -149,7 +149,12 @@ def photo_check(
     for r in rows:
         w = wants.get(r["want_id"])
         old = json.loads(r["art"]) if r["art"] else {}
-        if not w or (old and old.get("verdict") != "unchecked" and not old.get("retry")):
+        if not w:
+            continue
+        stale = old.get("verdict") == "differs" and any(  # judged before the small-ref rule
+            photos.small(p) for p in photos.refs_for(w, s.refs_dir)
+        )
+        if old and old.get("verdict") != "unchecked" and not old.get("retry") and not stale:
             continue
         res = photos.check(w, r["item_id"], r["img"], s.refs_dir, s.photos_dir)
         if res["verdict"] in ("differs", "unclear", "unwanted"):
