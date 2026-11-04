@@ -127,12 +127,18 @@ def photo_check(
     pages = ITEM_PAGES_PER_RUN
     for r in rows:
         w = wants.get(r["want_id"])
-        if not w or (r["art"] and json.loads(r["art"]).get("verdict") != "unchecked"):
+        old = json.loads(r["art"]) if r["art"] else {}
+        if not w or (old and old.get("verdict") != "unchecked" and not old.get("retry")):
             continue
         res = photos.check(w, r["item_id"], r["img"], s.refs_dir, s.photos_dir)
-        if res["verdict"] in ("differs", "unclear") and b is not None and pages > 0:
-            pages -= 1
-            for i, src in enumerate(b.item_photos(r["item_id"])[:4]):
+        if res["verdict"] in ("differs", "unclear"):
+            srcs = []
+            if b is not None and pages > 0:
+                pages -= 1
+                srcs = b.item_photos(r["item_id"])[:4]
+            # Without the listing's own photos the thumbnail verdict is provisional: try again later.
+            res["retry"] = not srcs
+            for i, src in enumerate(srcs):
                 alt = photos.check(w, f"{r['item_id']}_{i}", src, s.refs_dir, s.photos_dir)
                 if (alt["score"] or 0) > (res["score"] or 0):
                     res = alt
@@ -227,11 +233,7 @@ def alert(db: DB, s: Settings, run_id: int, wants: dict[int, dict]) -> tuple[int
 
 
 def baseline(db: DB, s: Settings, run_id: int, deals: int) -> tuple[int, str]:
-    """First sweep: today's deals go in the ledger unannounced, behind one summary alert."""
-    for r in db.all(
-        "SELECT item_id, kind, usd FROM listings WHERE last_run = ? AND deal = 1", run_id
-    ):
-        _mark(db, dict(r), run_id)
+    """First alerting sweep: one summary alert; today's deals join the ledger only once it is sent."""
     res = notify.send(
         s.apprise_urls,
         f"cardhound is watching: {deals} deals live now",
@@ -239,6 +241,12 @@ def baseline(db: DB, s: Settings, run_id: int, deals: int) -> tuple[int, str]:
         s.link(f"/run/{run_id}"),
         "Open deals",
     )
+    if res == "sent":
+        for r in db.all(
+            "SELECT item_id, kind, usd FROM listings WHERE last_run = ? AND deal = 1", run_id
+        ):
+            _mark(db, dict(r), run_id)
+        db.put("baseline_done", True)
     return 0, f"baseline {res}"
 
 
@@ -252,6 +260,44 @@ def _mark(db: DB, r: dict, run_id: int) -> None:
         r["usd"],
         run_id,
     )
+
+
+def load_export(db: DB, body: dict) -> dict:
+    """Load {wants, defaults, gem_rates, block, pop: {fetched, rows}, sold}; wants match on set and name."""
+    added = updated = 0
+    existing = {(w.get("set"), w["who"]): w["_id"] for w in db.wants()}
+    for w in body.get("wants", []):
+        key = (w.get("set"), w["who"])
+        db.save_want(w, existing.get(key))
+        if key in existing:
+            updated += 1
+        else:
+            added += 1
+    for setting in ("defaults", "gem_rates"):
+        if setting in body:
+            db.put(setting, body[setting])
+    for item, why in (body.get("block") or {}).items():
+        db.run("INSERT OR REPLACE INTO blocked (item_id, reason) VALUES (?, ?)", item, why)
+    pop = body.get("pop") or {}
+    if pop.get("rows"):
+        with db.tx() as c:
+            c.execute("DELETE FROM pop")
+            c.executemany(
+                "INSERT INTO pop (set_name, term, descr, gems, total, fetched) VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        p["set"],
+                        p.get("term"),
+                        p["desc"],
+                        p["gems"],
+                        p["total"],
+                        pop.get("fetched", ""),
+                    )
+                    for p in pop["rows"]
+                ],
+            )
+    sold = import_sold(db, body["sold"]) if body.get("sold") else 0
+    return {"added": added, "updated": updated, "pop": len(pop.get("rows", [])), "sold": sold}
 
 
 def import_sold(db: DB, sold: dict) -> int:
@@ -324,14 +370,16 @@ def run(
             photo_check(db, s, b, by_id, run_id)
         row = db.one("SELECT count(*) AS n FROM listings WHERE last_run = ? AND deal = 1", run_id)
         deals = row["n"] if row else 0
-        first = not db.one("SELECT 1 FROM runs WHERE status = 'success' AND id != ?", run_id)
-        if notify_on and first and not only:
+        first = not db.get("baseline_done", False)
+        if n == 0:
+            sent, status = 0, "nothing searched"
+        elif notify_on and first and not only:
             sent, status = baseline(db, s, run_id, deals)
         elif notify_on:
             sent, status = alert(db, s, run_id, by_id)
         else:
             sent, status = 0, "off for this run"
-        all_failed = 0 < n == len(failed)
+        all_failed = n == len(failed)  # also true when nothing was searched at all
         db.run(
             "UPDATE runs SET finished = datetime('now'), status = ?, searches = ?, failed = ?, "
             "listings = ?, deals = ?, new_deals = ?, alerts = ? WHERE id = ?",

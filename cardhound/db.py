@@ -10,7 +10,7 @@ from typing import Any, Iterator
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS wants (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     spec TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1,
     created TEXT NOT NULL DEFAULT (datetime('now')),

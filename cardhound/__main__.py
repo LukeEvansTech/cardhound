@@ -44,13 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         row = db.one("SELECT status FROM runs WHERE id = ?", run_id)
         return 0 if row and row["status"] == "success" else 1
     if a.cmd == "import":
-        from fastapi.testclient import TestClient
-
-        from .web import create_app
-
         with open(a.path, encoding="utf-8") as f:
-            body = json.load(f)
-        print(TestClient(create_app(s, db)).post("/api/import", json=body).json())
+            print(sweep.load_export(db, json.load(f)))
         return 0
     return 2
 

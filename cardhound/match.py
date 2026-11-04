@@ -136,8 +136,11 @@ def shipping(text: str) -> float | None:
 def ceiling(w: dict, kind: str, star: str, defaults: dict) -> float | None:
     mx = w.get("max", {})
     if kind == "raw":
-        if star in w.get("rawmax", {}):
-            return float(w["rawmax"][star])
+        rawmax = w.get("rawmax", {})
+        if star in rawmax:
+            return float(rawmax[star])
+        if "any" in rawmax:
+            return float(rawmax["any"])
         if "raw_max" in w:
             return float(w["raw_max"])
         return float(defaults["raw_1star_max"]) if star == "1" else None

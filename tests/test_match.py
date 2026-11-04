@@ -64,3 +64,9 @@ def test_money_and_shipping():
     assert match.shipping("Buy It Now +$5.64 delivery Located in United States") == 5.64
     assert match.shipping("Free delivery") == 0.0
     assert match.shipping("Buy It Now") is None
+
+
+def test_raw_any_ceiling():
+    w = {"rawmax": {"any": 50}}
+    assert match.ceiling(w, "raw", "-", DEFAULTS) == 50
+    assert match.ceiling(w, "raw", "1", DEFAULTS) == 50

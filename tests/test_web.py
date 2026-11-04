@@ -90,7 +90,7 @@ def test_failed_send_is_retried_next_sweep(env, monkeypatch):
 
 def test_want_form_validates(env):
     _, _, client = env
-    r = client.post("/wants", data={"who": "Cloud", "set": "FIN", "extra": "{}"})
+    r = client.post("/wants", data={"who": "Cloud", "set": "FIN", "extra": "{}", "enabled": "on"})
     assert "need an eBay search" in r.text
     r = client.post(
         "/wants",
@@ -140,3 +140,79 @@ def test_sold_import_maps_wants_and_feeds_verdict(env):
     assert client.post("/api/sold", json={"sold": sold}).json() == {"added": 1}
     assert client.post("/api/sold", json={"sold": sold}).json() == {"added": 0}
     assert db.one("SELECT usd FROM sold")["usd"] == 1188
+
+
+def test_failed_baseline_send_is_retried(env, monkeypatch):
+    s, db, client = env
+    client.post(
+        "/api/import",
+        json={"wants": [{"set": "DBS", "who": "Vegito", "q": "v", "max": {"any": 900}}]},
+    )
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "failed: x")
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    assert db.one("SELECT count(*) AS n FROM alerts")["n"] == 0
+    sent = []
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: sent.append(a) or "sent")
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    assert len(sent) == 1 and "watching" in sent[0][1]
+    assert db.one("SELECT count(*) AS n FROM alerts")["n"] == 1
+
+
+def test_sweep_with_no_wants_is_not_a_success(env):
+    s, db, _ = env
+    run_id = sweep.run(db, s, browser=lambda: FakeBrowser([]))
+    assert db.one("SELECT status FROM runs WHERE id = ?", run_id)["status"] == "failed"
+    assert not db.get("baseline_done", False)
+
+
+def test_unticked_watching_pauses_and_delete_clears_sales(env):
+    _, db, client = env
+    r = client.post(
+        "/wants",
+        data={"who": "Cloud", "set": "FIN", "q": "cloud", "extra": "{}"},
+        follow_redirects=False,
+    )
+    want_id = int(r.headers["location"].rsplit("/", 1)[1])
+    assert db.want(want_id)["_enabled"] is False
+    client.post(
+        "/api/sold",
+        json={
+            "sold": {
+                "1": {
+                    "set": "FIN",
+                    "who": "Cloud",
+                    "kind": "psa",
+                    "star": "-",
+                    "usd": 10,
+                    "date": "2099-01-01",
+                    "title": "t",
+                }
+            }
+        },
+    )
+    client.post(f"/wants/{want_id}/delete")
+    assert db.one("SELECT count(*) AS n FROM sold")["n"] == 0
+    r = client.post(
+        "/wants",
+        data={"who": "Tifa", "set": "FIN", "q": "t", "extra": "{}"},
+        follow_redirects=False,
+    )
+    assert int(r.headers["location"].rsplit("/", 1)[1]) != want_id
+
+
+def test_form_error_keeps_values(env):
+    _, _, client = env
+    r = client.post(
+        "/wants",
+        data={
+            "who": "Cloud",
+            "set": "FIN",
+            "q": "c",
+            "id": "(",
+            "max_any": "45",
+            "refs": "cloud.jpg",
+            "extra": "{}",
+        },
+    )
+    assert "not a valid regular expression" in r.text
+    assert 'value="45"' in r.text and 'value="cloud.jpg"' in r.text

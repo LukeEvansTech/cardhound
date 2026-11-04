@@ -283,15 +283,27 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         try:
             spec = spec_from_form(form)
         except ValueError as e:
-            w = {k: v for k, v in form.items() if isinstance(v, str)}
-            return page(request, "want_form.html", w=w, extra=form.get("extra", "{}"), error=str(e))
-        new_id = db.save_want(spec, want_id, enabled=form.get("enabled", "on") == "on")
+            return page(
+                request,
+                "want_form.html",
+                w=form_echo(form, want_id),
+                extra=form.get("extra", "{}"),
+                error=str(e),
+            )
+        # An unticked checkbox is simply absent from the form.
+        new_id = db.save_want(spec, want_id, enabled=form.get("enabled") == "on")
         return RedirectResponse(f"/wants/{new_id}", status_code=303)
 
     @app.post("/wants/{want_id}/delete")
     def want_delete(want_id: int):
-        db.run("DELETE FROM listings WHERE want_id = ?", want_id)
-        db.run("DELETE FROM wants WHERE id = ?", want_id)
+        with db.tx() as c:
+            c.execute(
+                "DELETE FROM alerts WHERE item_id IN (SELECT item_id FROM listings WHERE want_id = ?)",
+                (want_id,),
+            )
+            c.execute("DELETE FROM listings WHERE want_id = ?", (want_id,))
+            c.execute("DELETE FROM sold WHERE want_id = ?", (want_id,))
+            c.execute("DELETE FROM wants WHERE id = ?", (want_id,))
         return RedirectResponse("/wants", status_code=303)
 
     @app.post("/wants/{want_id}/sweep")
@@ -346,40 +358,8 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     # --- import, images ---
     @app.post("/api/import")
     async def api_import(request: Request) -> dict:
-        """Load a wantwatch export: {wants, defaults, block, gem_rates, pop: {fetched, rows}}."""
-        body = await request.json()
-        added = updated = 0
-        existing = {(w.get("set"), w["who"]): w["_id"] for w in db.wants()}
-        for w in body.get("wants", []):
-            key = (w.get("set"), w["who"])
-            db.save_want(w, existing.get(key))
-            added, updated = (added, updated + 1) if key in existing else (added + 1, updated)
-        if "defaults" in body:
-            db.put("defaults", body["defaults"])
-        if "gem_rates" in body:
-            db.put("gem_rates", body["gem_rates"])
-        for item, why in (body.get("block") or {}).items():
-            db.run("INSERT OR REPLACE INTO blocked (item_id, reason) VALUES (?, ?)", item, why)
-        pop = body.get("pop")
-        if pop and pop.get("rows"):
-            with db.tx() as c:
-                c.execute("DELETE FROM pop")
-                c.executemany(
-                    "INSERT INTO pop (set_name, term, descr, gems, total, fetched) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    [
-                        (
-                            p["set"],
-                            p.get("term"),
-                            p["desc"],
-                            p["gems"],
-                            p["total"],
-                            pop.get("fetched", ""),
-                        )
-                        for p in pop["rows"]
-                    ],
-                )
-        return {"added": added, "updated": updated, "pop": len((pop or {}).get("rows", []))}
+        """Load a wantwatch export: {wants, defaults, block, gem_rates, pop: {fetched, rows}, sold}."""
+        return sweep.load_export(db, await request.json())
 
     @app.post("/api/sold")
     async def api_sold(request: Request) -> dict:
@@ -415,6 +395,18 @@ def _file(base: Path, name: str) -> FileResponse:
     if not SAFE_NAME.match(name) or not (base / name).is_file():
         raise HTTPException(404, "no such image")
     return FileResponse(base / name, headers={"Cache-Control": "max-age=86400"})
+
+
+def form_echo(form: dict, want_id: int | None) -> dict:
+    """The submitted form in the shape the template reads, so a validation error loses nothing."""
+    w: dict = {k: str(v) for k, v in form.items() if isinstance(v, str) and not k.startswith("max")}
+    for key, prefix in (("max", "max_"), ("rawmax", "rawmax_")):
+        w[key] = {b: str(form[prefix + b]) for b in ("1", "2", "3", "any") if form.get(prefix + b)}
+    w["refs"] = [r.strip() for r in str(form.get("refs", "")).split(",") if r.strip()]
+    w["_enabled"] = form.get("enabled") == "on"
+    if want_id is not None:
+        w["_id"] = want_id
+    return w
 
 
 FORM_KEYS = {"set", "who", "q", "rawq", "need", "id", "max", "rawmax", "refs", "cards", "notes"}
