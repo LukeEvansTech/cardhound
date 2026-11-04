@@ -141,7 +141,7 @@ def photo_check(
         if not w or (old and old.get("verdict") != "unchecked" and not old.get("retry")):
             continue
         res = photos.check(w, r["item_id"], r["img"], s.refs_dir, s.photos_dir)
-        if res["verdict"] in ("differs", "unclear"):
+        if res["verdict"] in ("differs", "unclear", "unwanted"):
             srcs = []
             if b is not None and pages > 0:
                 pages -= 1
@@ -150,10 +150,11 @@ def photo_check(
             for i, src in enumerate(srcs):
                 alt = photos.check(w, f"{r['item_id']}_{i}", src, s.refs_dir, s.photos_dir)
                 complete = complete and alt["verdict"] != "unchecked"
+                if alt["verdict"] == "match":  # a kept art matching beats any other score
+                    res = alt
+                    break
                 if (alt["score"] or 0) > (res["score"] or 0):
                     res = alt
-                if alt["verdict"] == "match":
-                    break
             # Until one of the listing's own photos was scored, the thumbnail verdict is provisional.
             res["retry"] = not complete and res["verdict"] != "match"
         db.run(

@@ -324,3 +324,33 @@ def test_wants_cards_view_art_picker_and_defaults(env):
     assert r.status_code == 303
     assert db.defaults()["raw_1star_max"] == 12
     assert client.post("/wants/defaults", data={"psa_1star_max": "x"}).status_code == 400
+
+
+def test_kept_art_match_in_gallery_beats_an_unwanted_thumbnail(env, monkeypatch):
+    s, db, client = env
+    client.post(
+        "/api/import",
+        json={
+            "wants": [
+                {"set": "DBS", "who": "Vegito", "q": "v", "max": {"any": 900}, "refs": ["a.jpg"]}
+            ]
+        },
+    )
+    calls = []
+
+    def fake_check(w, key, src, refs_dir, photos_dir):
+        calls.append(key)
+        if key == "111":
+            return {"verdict": "unwanted", "score": 100, "ref": "b.jpg", "photo": "p"}
+        return {"verdict": "match", "score": 60, "ref": "a.jpg", "photo": "q"}
+
+    class Gallery(FakeBrowser):
+        def item_photos(self, _item_id):
+            return ["http://x/1.jpg", "http://x/2.jpg"]
+
+    monkeypatch.setattr(sweep.photos, "check", fake_check)
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    sweep.run(db, s, browser=lambda: Gallery([ROW]))
+    row = db.one("SELECT deal, art FROM listings WHERE item_id = '111'")
+    assert '"match"' in row["art"] and row["deal"] == 1
+    assert calls == ["111", "111_0"]
