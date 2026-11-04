@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 import re
 import threading
 import urllib.parse
@@ -75,6 +76,13 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     tpl.env.filters["ebay_img"] = ebay_img
     tpl.env.globals["version"] = s.version
     progress: list[str] = []
+
+    def art_choices(w: dict) -> list[dict]:
+        skip = set_of(w.get("skip"))
+        return [
+            {"name": r.name, "label": photos.label(r.name), "kept": r.name not in skip}
+            for r in photos.refs_for(w, s.refs_dir)
+        ]
 
     def page(request: Request, name: str, **ctx) -> HTMLResponse:
         return tpl.TemplateResponse(request, name, ctx)
@@ -255,7 +263,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
 
     # --- wants ---
     @app.get("/wants", response_class=HTMLResponse)
-    def wants_page(request: Request, set: str = ""):
+    def wants_page(request: Request, set: str = "", view: str = "cards"):
         wants = db.wants()
         counts = {
             (r["want_id"]): (r["n"], r["d"])
@@ -267,11 +275,49 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         if set:
             wants = [w for w in wants if w.get("set") == set]
         sets = sorted({w.get("set", "") for w in db.wants()})
-        return page(request, "wants.html", wants=wants, counts=counts, sets=sets, cur_set=set)
+        thumbs = {}
+        for w in wants:
+            refs = photos.refs_for(w, s.refs_dir)
+            kept = [r for r in refs if r.name not in set_of(w.get("skip"))]
+            if refs:
+                thumbs[w["_id"]] = {
+                    "name": (kept or refs)[0].name,
+                    "kept": len(kept),
+                    "total": len(refs),
+                }
+        return page(
+            request,
+            "wants.html",
+            wants=wants,
+            counts=counts,
+            sets=sets,
+            cur_set=set,
+            view="table" if view == "table" else "cards",
+            thumbs=thumbs,
+            defaults=db.defaults(),
+        )
+
+    @app.post("/wants/defaults")
+    async def wants_defaults(request: Request):
+        form = await request.form()
+        cur = db.defaults()
+        for key in ("psa_1star_max", "raw_1star_max"):
+            raw = str(form.get(key, "")).strip().lstrip("$").replace(",", "")
+            try:
+                val = float(raw)
+            except ValueError as e:
+                raise HTTPException(400, f"{key} must be a number") from e
+            if not math.isfinite(val) or val < 0:
+                raise HTTPException(400, f"{key} must be a number of zero or more")
+            cur[key] = val
+        db.put("defaults", cur)
+        return RedirectResponse("/wants", status_code=303)
 
     @app.get("/wants/new", response_class=HTMLResponse)
     def want_new(request: Request):
-        return page(request, "want_form.html", w={"set": "", "who": ""}, extra="{}", error="")
+        return page(
+            request, "want_form.html", w={"set": "", "who": ""}, extra="{}", error="", art=[]
+        )
 
     @app.get("/wants/{want_id}", response_class=HTMLResponse)
     def want_edit(request: Request, want_id: int):
@@ -285,21 +331,29 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             w=w,
             extra=json.dumps(extra, indent=1, ensure_ascii=False),
             error="",
+            art=art_choices(w),
         )
 
     @app.post("/wants")
     async def want_save(request: Request):
-        form = dict(await request.form())
+        data = await request.form()
+        form: dict = dict(data)
+        form["keep"] = [str(x) for x in data.getlist("keep")]
+        form["art_all"] = [str(x) for x in data.getlist("art_all")]
         want_id = int(str(form["_id"])) if form.get("_id") else None
+        old = db.want(want_id) if want_id is not None else None
+        form["prev_skip"] = sorted(set_of((old or {}).get("skip")))
         try:
             spec = spec_from_form(form)
         except ValueError as e:
+            echo = form_echo(form, want_id)
             return page(
                 request,
                 "want_form.html",
-                w=form_echo(form, want_id),
+                w=echo,
                 extra=form.get("extra", "{}"),
                 error=str(e),
+                art=art_choices(echo),
             )
         # An unticked checkbox is simply absent from the form.
         new_id = db.save_want(spec, want_id, enabled=form.get("enabled") == "on")
@@ -418,12 +472,31 @@ def form_echo(form: dict, want_id: int | None) -> dict:
         w[key] = {b: str(form[prefix + b]) for b in ("1", "2", "3", "any") if form.get(prefix + b)}
     w["refs"] = [r.strip() for r in str(form.get("refs", "")).split(",") if r.strip()]
     w["_enabled"] = form.get("enabled") == "on"
+    keep = set(form.get("keep") or [])
+    w["skip"] = [a for a in form.get("art_all") or [] if a not in keep]
     if want_id is not None:
         w["_id"] = want_id
     return w
 
 
-FORM_KEYS = {"set", "who", "q", "rawq", "need", "id", "max", "rawmax", "refs", "cards", "notes"}
+FORM_KEYS = {
+    "set",
+    "who",
+    "q",
+    "rawq",
+    "need",
+    "id",
+    "max",
+    "rawmax",
+    "refs",
+    "cards",
+    "notes",
+    "skip",
+}
+
+
+def set_of(v) -> set[str]:
+    return {str(x) for x in v} if isinstance(v, list) else set()
 
 
 def spec_from_form(form: dict) -> dict:
@@ -462,6 +535,8 @@ def spec_from_form(form: dict) -> dict:
                     vals[b] = float(raw)
                 except ValueError as e:
                     raise ValueError(f"Ceiling '{raw}' is not a number") from e
+                if not math.isfinite(vals[b]) or vals[b] < 0:
+                    raise ValueError(f"Ceiling '{raw}' must be a number of zero or more")
         if vals:
             spec[key] = vals
         else:
@@ -471,6 +546,15 @@ def spec_from_form(form: dict) -> dict:
         spec["refs"] = refs
     else:
         spec.pop("refs", None)
+    every, keep = form.get("art_all") or [], set(form.get("keep") or [])
+    # Exclusions for art not on the form (its file is missing just now) are kept as they were.
+    prev = set(form.get("prev_skip") or []) | set_of(spec.get("skip"))
+    skip = [a for a in sorted(prev) if a not in every]
+    skip += [a for a in every if a not in keep]
+    if skip:
+        spec["skip"] = skip
+    else:
+        spec.pop("skip", None)
     if spec.get("set") not in match.UA_SETS and not spec.get("q"):
         raise ValueError("Cards outside Union Arena need an eBay search (PSA 10 query)")
     return spec

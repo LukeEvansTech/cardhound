@@ -1,7 +1,9 @@
 """End to end: import wants, sweep with a fake browser, open the alert's deal page."""
 
+import datetime as dt
+
 import pytest
-from cardhound import config, sweep
+from cardhound import config, photos, sweep
 from cardhound.db import DB
 from cardhound.web import create_app
 from fastapi.testclient import TestClient
@@ -92,6 +94,11 @@ def test_want_form_validates(env):
     _, _, client = env
     r = client.post("/wants", data={"who": "Cloud", "set": "FIN", "extra": "{}", "enabled": "on"})
     assert "need an eBay search" in r.text
+    r = client.post(
+        "/wants",
+        data={"who": "Cloud", "set": "FIN", "q": "c", "max_any": "inf", "extra": "{}"},
+    )
+    assert "zero or more" in r.text
     r = client.post(
         "/wants",
         data={
@@ -234,3 +241,140 @@ def test_cross_site_write_is_refused(env):
     _, _, client = env
     r = client.post("/ops/run", headers={"Origin": "https://evil.example"}, follow_redirects=False)
     assert r.status_code == 403
+
+
+def _sold(n, usd):
+    return {
+        str(900 + i): {
+            "set": "DBS",
+            "who": "Vegito",
+            "kind": "psa",
+            "star": "-",
+            "usd": usd,
+            "date": dt.date.today().isoformat(),
+            "title": "Vegito PSA 10",
+        }
+        for i in range(n)
+    }
+
+
+def test_under_ceiling_but_above_sold_prices_is_not_a_deal(env, monkeypatch):
+    s, db, client = env
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    client.post(
+        "/api/import",
+        json={"wants": [{"set": "DBS", "who": "Vegito", "q": "v", "max": {"any": 1150}}]},
+    )
+    client.post("/api/sold", json={"sold": _sold(3, 600)})
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))  # $705.64 landed, 118% of the median
+    assert db.one("SELECT deal FROM listings WHERE item_id = '111'")["deal"] == 0
+    cheap = {**ROW, "id": "333", "price": "$400.00"}
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW, cheap]))
+    assert db.one("SELECT deal FROM listings WHERE item_id = '333'")["deal"] == 1
+    assert db.one("SELECT deal FROM listings WHERE item_id = '111'")["deal"] == 0
+
+
+def test_unticked_art_makes_a_photo_unwanted(tmp_path, monkeypatch):
+    refs, shots = tmp_path / "refs", tmp_path / "photos"
+    refs.mkdir()
+    shots.mkdir()
+    for n in ("a.jpg", "b.jpg"):
+        (refs / n).write_bytes(b"x")
+    monkeypatch.setattr(photos, "download", lambda src, dest: dest)
+    w = {"set": "DBS", "refs": ["a.jpg", "b.jpg"], "skip": ["b.jpg"]}
+    monkeypatch.setattr(photos, "score", lambda p, r: 60 if r.name == "b.jpg" else 5)
+    assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "unwanted"
+    monkeypatch.setattr(photos, "score", lambda p, r: 60)  # a kept art matches as well
+    assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "match"
+    assert photos.label("UE09BT_FMA-1-012_p2.jpg") == "012 ★★"
+    assert photos.label("UEPR_FMA-1-010_p1.jpg") == "promo 010"
+
+
+def test_wants_cards_view_art_picker_and_defaults(env):
+    _, db, client = env
+    for n in ("a.jpg", "b.jpg"):
+        client.put(f"/api/refs/{n}", content=b"x" * 2000)
+    client.post(
+        "/api/import",
+        json={"wants": [{"set": "DBS", "who": "Vegito", "q": "v", "refs": ["a.jpg", "b.jpg"]}]},
+    )
+    page = client.get("/wants")
+    assert "/refs/a.jpg" in page.text and "2 of 2 arts" in page.text
+    assert "<table" in client.get("/wants?view=table").text
+    form = client.get("/wants/1").text
+    assert 'name="keep" value="b.jpg"' in form
+    r = client.post(
+        "/wants",
+        data={
+            "_id": "1",
+            "who": "Vegito",
+            "set": "DBS",
+            "q": "v",
+            "refs": "a.jpg, b.jpg",
+            "keep": ["a.jpg"],
+            "art_all": ["a.jpg", "b.jpg"],
+            "extra": "{}",
+            "enabled": "on",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert db.want(1)["skip"] == ["b.jpg"]
+    assert "1 of 2 arts" in client.get("/wants").text
+    r = client.post(
+        "/wants/defaults",
+        data={"psa_1star_max": "70", "raw_1star_max": "$12"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert db.defaults()["raw_1star_max"] == 12
+    assert client.post("/wants/defaults", data={"psa_1star_max": "x"}).status_code == 400
+    nan = {"psa_1star_max": "nan", "raw_1star_max": "12"}
+    assert client.post("/wants/defaults", data=nan).status_code == 400
+    # an unticked art whose file has gone missing keeps its exclusion through an unrelated save
+    db.run("UPDATE wants SET spec = json_set(spec, '$.skip', json('[\"gone.jpg\"]'))")
+    client.post(
+        "/wants",
+        data={
+            "_id": "1",
+            "who": "Vegito",
+            "set": "DBS",
+            "q": "v",
+            "refs": "a.jpg, b.jpg",
+            "keep": ["a.jpg", "b.jpg"],
+            "art_all": ["a.jpg", "b.jpg"],
+            "extra": "{}",
+            "enabled": "on",
+        },
+    )
+    assert db.want(1)["skip"] == ["gone.jpg"]
+
+
+def test_kept_art_match_in_gallery_beats_an_unwanted_thumbnail(env, monkeypatch):
+    s, db, client = env
+    client.post(
+        "/api/import",
+        json={
+            "wants": [
+                {"set": "DBS", "who": "Vegito", "q": "v", "max": {"any": 900}, "refs": ["a.jpg"]}
+            ]
+        },
+    )
+    calls = []
+
+    def fake_check(_w, key, *_rest):
+        calls.append(key)
+        if key == "111":
+            return {"verdict": "unwanted", "score": 100, "ref": "b.jpg", "photo": "p"}
+        return {"verdict": "match", "score": 60, "ref": "a.jpg", "photo": "q"}
+
+    class Gallery(FakeBrowser):
+        def item_photos(self, _item_id):
+            return ["http://x/1.jpg", "http://x/2.jpg"]
+
+    monkeypatch.setattr(sweep.photos, "check", fake_check)
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    sweep.run(db, s, browser=lambda: Gallery([ROW]))
+    row = db.one("SELECT deal, art FROM listings WHERE item_id = '111'")
+    assert '"match"' in row["art"] and row["deal"] == 1
+    assert calls == ["111", "111_0"]

@@ -18,7 +18,12 @@ sweep (cron) ─▶ eBay search per want (headless Chromium) ─▶ listings
 - **Wants** are edited on the Wants page (or loaded with `POST /api/import`). A Union Arena want
   (set `FMA`, `EVA`, `CSM`, `AOT`) builds its searches from the card name; any other card takes an
   eBay query. Ceilings are per star bucket, in USD, compared with the landed price (price plus
-  delivery).
+  delivery). The Wants page shows each want as a card with its official art; on the page for one want you
+  can untick arts you don't want, and listings whose photo matches only those stop counting as
+  deals. 1★ defaults for cards with no ceiling of their own are set at the foot of the Wants page.
+- **Deal**: under the ceiling and either `great`, `good` or `unknown` (no sold prices yet). A raw
+  copy rated `fair` or `high` still counts when grading it costs under 85% of the PSA 10 sold
+  median. Anything else under the ceiling is listed but not alerted.
 - **Verdict**: `great` / `good` / `fair` / `high` against the 90-day sold median for the same
   card, kind (PSA 10 or raw) and star bucket, plus the cost of one PSA 10 by grading a raw copy:
   `(raw price + grading fee + shipping) / gem rate`. The gem rate is the card's own PSA pop when 10
