@@ -74,6 +74,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     tpl.env.filters["money"] = money
     tpl.env.filters["star"] = star_label
     tpl.env.filters["ebay_img"] = ebay_img
+    tpl.env.filters["pct"] = pct
     tpl.env.globals["version"] = s.version
     progress: list[str] = []
 
@@ -466,6 +467,15 @@ def _file(base: Path, name: str) -> FileResponse:
     if not SAFE_NAME.match(name) or not (base / name).is_file():
         raise HTTPException(404, "no such image")
     return FileResponse(base / name, headers={"Cache-Control": "max-age=86400"})
+
+
+def pct(v) -> str:
+    """A rate as a percentage, tolerating the strings and nulls /api/import accepts."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return "not set"
+    return f"{f:.0%}" if math.isfinite(f) else "not set"
 
 
 def form_echo(form: dict, want_id: int | None) -> dict:

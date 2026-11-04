@@ -452,3 +452,10 @@ def test_one_tiny_wanted_reference_keeps_a_low_score_unclear(tmp_path, monkeypat
     assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "unclear"
     w["skip"] = ["tiny.png"]  # unticked, so only the large art counts
     assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "differs"
+
+
+def test_runs_page_tolerates_odd_gem_rates(env):
+    _, db, client = env
+    db.put("gem_rates", {"FMA": "0.77", "EVA": None})
+    page = client.get("/ops")
+    assert page.status_code == 200 and "FMA 77%" in page.text and "EVA not set" in page.text

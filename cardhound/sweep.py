@@ -152,7 +152,9 @@ def photo_check(
         if not w:
             continue
         stale = old.get("verdict") == "differs" and any(  # judged before the small-ref rule
-            photos.small(p) for p in photos.refs_for(w, s.refs_dir)
+            photos.small(p)
+            for p in photos.refs_for(w, s.refs_dir)
+            if p.name not in (w.get("skip") or [])
         )
         if old and old.get("verdict") != "unchecked" and not old.get("retry") and not stale:
             continue
