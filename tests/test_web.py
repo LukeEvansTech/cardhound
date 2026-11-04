@@ -228,3 +228,9 @@ def test_run_page_keeps_its_deals_after_a_later_price_drop(env, monkeypatch):
     run1 = sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
     sweep.run(db, s, browser=lambda: FakeBrowser([{**ROW, "price": "$500.00"}]))
     assert "Vegito" in client.get(f"/run/{run1}").text
+
+
+def test_cross_site_write_is_refused(env):
+    _, _, client = env
+    r = client.post("/ops/run", headers={"Origin": "https://evil.example"}, follow_redirects=False)
+    assert r.status_code == 403

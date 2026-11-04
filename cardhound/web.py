@@ -58,6 +58,17 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     db = db or DB(s.db_path)
     app = FastAPI(title="cardhound", docs_url=None, redoc_url=None)
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+
+    @app.middleware("http")
+    async def same_origin(request: Request, call_next):
+        """Refuse a browser write that another site's page sent (no login here, so no CSRF token)."""
+        if request.method in ("POST", "PUT", "DELETE"):
+            origin = request.headers.get("origin") or request.headers.get("referer") or ""
+            host = urllib.parse.urlsplit(origin).netloc
+            if origin and host != request.headers.get("host", ""):
+                return PlainTextResponse("cross-site request refused", status_code=403)
+        return await call_next(request)
+
     tpl = Jinja2Templates(directory=HERE / "templates")
     tpl.env.filters["money"] = money
     tpl.env.filters["star"] = star_label

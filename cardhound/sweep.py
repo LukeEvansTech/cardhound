@@ -89,6 +89,10 @@ def collect(b: Browser, w: dict, blocked: set[str], defaults: dict, today: str, 
 
 def store(db: DB, run_id: int, found: list[dict], sold: list[dict], searched: list[tuple]) -> None:
     now = dt.datetime.now().isoformat(timespec="seconds")
+    live = {w["_id"] for w in db.wants()}  # a want deleted mid-sweep must not come back
+    found = [f for f in found if f["want_id"] in live]
+    sold = [x for x in sold if x["want_id"] in live]
+    searched = [x for x in searched if x[0] in live]
     with db.tx() as c:
         for s in sold:
             c.execute(
@@ -140,16 +144,16 @@ def photo_check(
             if b is not None and pages > 0:
                 pages -= 1
                 srcs = b.item_photos(r["item_id"])[:4]
-            checked = False
+            complete = bool(srcs)
             for i, src in enumerate(srcs):
                 alt = photos.check(w, f"{r['item_id']}_{i}", src, s.refs_dir, s.photos_dir)
-                checked = checked or alt["verdict"] != "unchecked"
+                complete = complete and alt["verdict"] != "unchecked"
                 if (alt["score"] or 0) > (res["score"] or 0):
                     res = alt
                 if alt["verdict"] == "match":
                     break
             # Until one of the listing's own photos was scored, the thumbnail verdict is provisional.
-            res["retry"] = not checked and res["verdict"] != "match"
+            res["retry"] = not complete and res["verdict"] != "match"
         db.run(
             "UPDATE listings SET art = ? WHERE item_id = ? AND kind = ?",
             json.dumps(res),
@@ -196,7 +200,9 @@ def alert(db: DB, s: Settings, run_id: int, wants: dict[int, dict]) -> tuple[int
     cmp, pop = context(db)
     scored = []
     for r in fresh:
-        w = wants[r["want_id"]]
+        w = wants.get(r["want_id"])
+        if not w:
+            continue
         scored.append((r, verdict_for(db, s, r, w, cmp, pop)))
     order = {"great": 0, "good": 1, "unknown": 2, "fair": 3, "high": 4}
     scored.sort(key=lambda x: (order.get(x[1].rating, 5), x[1].total))
