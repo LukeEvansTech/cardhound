@@ -19,12 +19,24 @@
     {% for b in ['1', '2', '3', 'any'] %}<label class="mini">{{ b | star or 'any' }} <input name="rawmax_{{ b }}" inputmode="decimal" value="{{ (w.rawmax or {}).get(b, '') }}"></label>{% endfor %}
   </fieldset>
   <label>Card numbers <input name="cards" value="{{ w.cards or '' }}" placeholder="011, 012 (1★, 2★)"></label>
+  {% if art %}
+  <fieldset class="art-pick"><legend>Which of these arts do you want?</legend>
+    <small>Untick an art and listings whose photo matches it stop counting as deals. A photo that also matches an art you kept still counts, so use the star ceilings above to choose between near-identical versions.</small>
+    <div class="art-grid">
+    {% for a in art %}
+      <label class="art"><input type="checkbox" name="keep" value="{{ a.name }}" {{ 'checked' if a.kept }}>
+        <img loading="lazy" src="/refs/{{ a.name }}" alt=""><span>{{ a.label }}</span></label>
+      <input type="hidden" name="art_all" value="{{ a.name }}">
+    {% endfor %}
+    </div>
+  </fieldset>
+  {% endif %}
   <label>Official art files <input name="refs" value="{{ (w.refs or []) | join(', ') }}" placeholder="filenames in /api/refs"></label>
   <label>Notes <input name="notes" value="{{ w.notes or '' }}"></label>
   <label class="check"><input type="checkbox" name="enabled" {{ 'checked' if w._enabled is not defined or w._enabled }}> Watching</label>
   <details {{ 'open' if extra and extra != '{}' }}><summary>Advanced (JSON)</summary>
     <textarea name="extra" rows="8">{{ extra }}</textarea>
-    <small>Other keys: match, raw (false skips raw), nostar, needstar, raw_max, pop {term,row}.</small>
+    <small>Other keys: match, raw (false skips raw), nostar, needstar, raw_max, pop {term,row}, skip (unticked arts).</small>
   </details>
   <div class="actions"><button class="primary">Save</button></div>
 </form>

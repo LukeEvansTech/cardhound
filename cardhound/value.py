@@ -88,6 +88,12 @@ class Verdict:
     total: float = 0.0
     grade_cost: float | None = None
     max_bid: float | None = None
+    buy_to_grade: bool = False
+
+    @property
+    def is_deal(self) -> bool:
+        """Under the ceiling is not enough: the price must also beat recent sales, or grading must pay."""
+        return self.rating in ("great", "good", "unknown") or self.buy_to_grade
 
 
 def _pct(a: float, b: float) -> str:
@@ -136,6 +142,7 @@ def assess(
         reasons.append(f"No {label} sales of this card recorded in the last 90 days")
 
     grade_cost = None
+    buy_to_grade = False
     if rate:
         base, what = (total, "this copy") if kind == "raw" else (None, "")
         if kind != "raw" and raw:
@@ -177,6 +184,7 @@ def assess(
     else:
         if grade_cost and ten:
             if grade_cost < ten.median * 0.85:
+                buy_to_grade = True
                 advice = f"Buy to grade: ~${grade_cost:,.0f} per PSA 10 against a ${ten.median:,.0f} slab median."
             else:
                 advice = (
@@ -204,4 +212,4 @@ def assess(
 
     star_txt = f"{star}★ " if star != "-" else ""
     headline = f"{w['who']} {star_txt}{'PSA 10' if kind == 'psa' else 'raw'} ${total:,.0f}"
-    return Verdict(rating, headline, advice, reasons, total, grade_cost, max_bid)
+    return Verdict(rating, headline, advice, reasons, total, grade_cost, max_bid, buy_to_grade)

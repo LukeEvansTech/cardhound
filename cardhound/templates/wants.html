@@ -6,11 +6,34 @@
   <a class="button primary" href="/wants/new">Add card</a>
 </section>
 <form class="filters" method="get">
+  <input type="hidden" name="view" value="{{ view }}">
   <select name="set" onchange="this.form.submit()">
     <option value="">All sets</option>
     {% for x in sets %}<option {{ 'selected' if x == cur_set }}>{{ x }}</option>{% endfor %}
   </select>
+  <span class="toggle">
+    <a href="?view=cards&amp;set={{ cur_set | urlencode }}" class="{{ 'on' if view == 'cards' }}">Cards</a>
+    <a href="?view=table&amp;set={{ cur_set | urlencode }}" class="{{ 'on' if view == 'table' }}">Table</a>
+  </span>
 </form>
+{% if view == 'cards' %}
+<div class="grid">
+  {% for w in wants %}
+  {% set c = counts.get(w._id, (0, 0)) %}
+  <a class="tile want-tile {{ '' if w._enabled else 'off' }}" href="/wants/{{ w._id }}">
+    {% set t = thumbs.get(w._id) %}
+    {% if t %}<img loading="lazy" src="/refs/{{ t.name }}" alt="">{% else %}<span class="noart">{{ w.set }}</span>{% endif %}
+    <div class="tile-body">
+      <strong class="tile-name">{{ w.who }}</strong>
+      <span class="muted small">{{ w.set }}{% if t and t.total > 1 %} · {{ t.kept }} of {{ t.total }} arts{% endif %}{% if not w._enabled %} · paused{% endif %}</span>
+      <span class="small">PSA {% for k, v in (w.max or {}).items() %}{{ k | star or k }} {{ v | money }} {% else %}<span class="muted">default</span>{% endfor %}</span>
+      <span class="small">Raw {% if w.raw is sameas false %}<span class="muted">off</span>{% else %}{% for k, v in (w.rawmax or {}).items() %}{{ k | star or k }} {{ v | money }} {% endfor %}{% if w.raw_max %}{{ w.raw_max | money }}{% elif not w.rawmax %}<span class="muted">default</span>{% endif %}{% endif %}</span>
+      <span class="small">{{ c[0] }} live · <b>{{ c[1] or 0 }} deal{{ 's' if (c[1] or 0) != 1 }}</b></span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
 <table class="list">
   <tr><th>Set</th><th>Card</th><th>PSA ceiling</th><th>Raw ceiling</th><th>Live</th><th>Deals</th><th></th></tr>
   {% for w in wants %}
@@ -19,11 +42,19 @@
     <td>{{ w.set }}</td>
     <td><a href="/wants/{{ w._id }}">{{ w.who }}</a>{% if w.cards %} <span class="muted small">{{ w.cards }}</span>{% endif %}</td>
     <td>{% for k, v in (w.max or {}).items() %}{{ k | star or k }} {{ v | money }} {% endfor %}</td>
-    <td>{% for k, v in (w.rawmax or {}).items() %}{{ k | star }} {{ v | money }} {% endfor %}{% if w.raw_max %}{{ w.raw_max | money }}{% endif %}</td>
+    <td>{% if w.raw is sameas false %}off{% else %}{% for k, v in (w.rawmax or {}).items() %}{{ k | star }} {{ v | money }} {% endfor %}{% if w.raw_max %}{{ w.raw_max | money }}{% endif %}{% endif %}</td>
     <td>{{ c[0] }}</td>
     <td>{{ c[1] or 0 }}</td>
     <td>{{ '' if w._enabled else 'paused' }}</td>
   </tr>
   {% endfor %}
 </table>
+{% endif %}
+<form class="defaults" method="post" action="/wants/defaults">
+  <h2>Defaults</h2>
+  <p class="muted small">Used for 1★ copies of any card without a ceiling of its own.</p>
+  <label class="mini">1★ PSA 10 <input name="psa_1star_max" inputmode="decimal" value="{{ defaults.psa_1star_max }}"></label>
+  <label class="mini">1★ raw <input name="raw_1star_max" inputmode="decimal" value="{{ defaults.raw_1star_max }}"></label>
+  <button>Save defaults</button>
+</form>
 {% endblock %}

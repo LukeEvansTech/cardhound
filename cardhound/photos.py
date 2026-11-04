@@ -89,9 +89,30 @@ def check(w: dict, key: str, src: str, refs_dir: Path, photos_dir: Path) -> dict
     photo = download(upgrade(src), photos_dir / f"{key}.jpg")
     if not photo:
         return none
-    best, ref = max(((score(photo, r), r) for r in refs), key=lambda x: x[0])
+    scored = [(score(photo, r), r) for r in refs]
+    best, ref = max(scored, key=lambda x: x[0])
     if best < 0:  # an image that would not decode is not evidence either way
         photo.unlink(missing_ok=True)  # so the next sweep downloads it again
         return none
     verdict = "match" if best >= MATCH else "differs" if best < DIFFERS else "unclear"
+    skip = set(w.get("skip") or [])
+    if verdict == "match" and ref.name in skip:
+        # 1★ and 2★ of one card share their art, so only call it unwanted when no kept art matches too.
+        kept = max((sc for sc, r in scored if r.name not in skip), default=0)
+        if kept < MATCH:
+            verdict = "unwanted"
     return {"verdict": verdict, "score": best, "ref": ref.name, "photo": photo.name}
+
+
+def label(name: str) -> str:
+    """Short caption for a reference image: card number and star tier, or promo."""
+    m = re.search(r"^(UEPR)?.*?-\d-(\d{3})(?:_p(\d))?", name)
+    if m:
+        promo, num, p = m.groups()
+        if promo:
+            return f"promo {num}"
+        return f"{num} {'★' * int(p)}" if p else num
+    m = re.search(r"^MTG_([a-z0-9]+)-(\d+)", name)
+    if m:
+        return f"{m.group(1).upper()} #{m.group(2)}"
+    return Path(name).stem

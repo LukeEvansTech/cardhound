@@ -164,6 +164,25 @@ def photo_check(
         )
 
 
+def rate(db: DB, s: Settings, run_id: int, wants: dict[int, dict]) -> int:
+    """Drop deals the sold comps say are fair or high; returns how many were dropped."""
+    rows = [
+        dict(r)
+        for r in db.all("SELECT * FROM listings WHERE last_run = ? AND deal = 1", run_id)
+    ]
+    if not rows:
+        return 0
+    cmp, pop = context(db)
+    drop = []
+    for r in rows:
+        w = wants.get(r["want_id"])
+        if w and not verdict_for(db, s, r, w, cmp, pop).is_deal:
+            drop.append((r["item_id"], r["kind"]))
+    with db.tx() as c:
+        c.executemany("UPDATE listings SET deal = 0 WHERE item_id = ? AND kind = ?", drop)
+    return len(drop)
+
+
 def context(db: DB) -> tuple[dict, list[dict]]:
     sold = [dict(r) for r in db.all("SELECT * FROM sold")]
     pop = [dict(r) for r in db.all("SELECT * FROM pop")]
@@ -407,8 +426,15 @@ def run(
             for f in found:
                 uniq.setdefault((f["item_id"], f["kind"]), f)
             store(db, run_id, list(uniq.values()), sold, searched)
+            demoted = rate(db, s, run_id, by_id)
+            say(f"price check: {demoted} under the ceiling but not below recent sales")
             say("photo check")
             photo_check(db, s, b, by_id, run_id)
+            db.run(  # a photo of art Luke has unticked on the want is not a deal either
+                "UPDATE listings SET deal = 0 WHERE last_run = ? AND deal = 1 "
+                "AND json_extract(art, '$.verdict') = 'unwanted'",
+                run_id,
+            )
         row = db.one("SELECT count(*) AS n FROM listings WHERE last_run = ? AND deal = 1", run_id)
         deals = row["n"] if row else 0
         first = not db.get("baseline_done", False)
