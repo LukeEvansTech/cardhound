@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ r.v.headline }} · cardhound{% endblock %}
 {% block body %}
-<section class="verdict rating-{{ r.v.rating }}">
+<section class="verdict">
   <span class="badge rating-{{ r.v.rating }}">{{ r.v.rating }}</span>
   <h1>{{ r.v.headline }}</h1>
   <p class="advice">{{ r.v.advice }}</p>
+  {% set v = r.v %}{% set big = true %}{% include "_meter.html" %}
   <div class="actions">
     <a class="button primary" href="https://www.ebay.com/itm/{{ r.item_id }}">Open on eBay</a>
     <a class="button" href="/wants/{{ w._id }}">Edit want</a>
@@ -17,7 +18,8 @@
     {% if r.artd.photo %}<img src="/photos/{{ r.artd.photo }}" alt="Listing photo">{% else %}<img src="{{ r.img | ebay_img(1600) }}" alt="Listing photo">{% endif %}
     <figcaption>Listing photo{% if r.artd.verdict and r.artd.verdict != 'unchecked' %}: photo check <b class="{{ 'ok' if r.artd.verdict == 'match' else 'warn' }}">{{ r.artd.verdict }}</b> (score {{ r.artd.score }}){% endif %}</figcaption>
   </figure>
-  {% for ref in refs[:3] %}
+  {% set ordered = ([r.artd.ref] if r.artd.ref in refs else []) + (refs | reject('equalto', r.artd.ref) | list) %}
+  {% for ref in ordered[:3] %}
   <figure class="{{ 'best' if ref == r.artd.ref }}">
     <img src="/refs/{{ ref }}" alt="Official art">
     <figcaption>Official art{% if ref == r.artd.ref %} (best match){% endif %}</figcaption>

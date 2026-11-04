@@ -359,6 +359,9 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         new_id = db.save_want(spec, want_id, enabled=form.get("enabled") == "on")
         # Its refs may have changed: photo verdicts are judged again on the next sweep.
         db.run("UPDATE listings SET art = NULL WHERE want_id = ?", new_id)
+        saved = db.want(new_id)
+        if saved:
+            sweep.retire_unsearched(db, saved)
         return RedirectResponse(f"/wants/{new_id}", status_code=303)
 
     @app.post("/wants/{want_id}/delete")

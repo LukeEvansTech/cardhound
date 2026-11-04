@@ -10,10 +10,11 @@
 <header class="top">
   <a class="brand" href="/">cardhound</a>
   <nav>
-    <a href="/">Deals</a>
-    <a href="/wants">Wants</a>
-    <a href="/wants/new">Add card</a>
-    <a href="/ops">Runs</a>
+    {% set here = request.url.path %}
+    <a href="/" {{ 'aria-current=page' if here == '/' or here.startswith('/deal') }}>Deals</a>
+    <a href="/wants" {{ 'aria-current=page' if here.startswith('/wants') and here != '/wants/new' }}>Wants</a>
+    <a href="/wants/new" {{ 'aria-current=page' if here == '/wants/new' }}>Add card</a>
+    <a href="/ops" {{ 'aria-current=page' if here.startswith('/ops') or here.startswith('/run') }}>Runs</a>
   </nav>
 </header>
 <main>

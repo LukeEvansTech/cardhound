@@ -1,11 +1,13 @@
 {# one listing tile: r has v (verdict), want, artd #}
-<a class="tile rating-{{ r.v.rating }}" href="/deal/{{ r.item_id }}/{{ r.kind }}">
-  <img loading="lazy" src="{{ r.img | ebay_img(300) }}" alt="">
+<a class="tile" href="/deal/{{ r.item_id }}/{{ r.kind }}">
+  <img loading="lazy" src="{{ r.img | ebay_img(300) }}" alt="" width="300" height="400">
   <div class="tile-body">
     <span class="badge rating-{{ r.v.rating }}">{{ r.v.rating }}</span>
     <strong class="tile-name">{{ r.want.who }}</strong>
-    <span class="muted">{{ r.want.set }} · {{ 'PSA 10' if r.kind == 'psa' else 'raw' }} {{ r.star | star }}</span>
-    <span class="tile-price">{{ r.v.total | money }}{% if r.cap %} <span class="muted">/ cap {{ r.cap | money }}</span>{% endif %}</span>
+    <span class="muted small">{{ r.want.set }} · {{ 'PSA 10' if r.kind == 'psa' else 'raw' }} {{ r.star | star }}</span>
+    <span class="tile-price num">{{ r.v.total | money }}</span>
+    {% if r.cap %}<span class="muted small num">ceiling {{ r.cap | money }}</span>{% endif %}
+    {% set v = r.v %}{% set big = false %}{% include "_meter.html" %}
     <span class="muted small">
       {% if r.auction %}auction {{ r.bids }} {{ r.time_left }}{% endif %}
       {% if r.obo %}OBO{% endif %}

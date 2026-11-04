@@ -125,6 +125,17 @@ def store(db: DB, run_id: int, found: list[dict], sold: list[dict], searched: li
             )
 
 
+def retire_unsearched(db: DB, w: dict) -> None:
+    """A kind the want no longer searches (raw switched off, say) has no live listings left."""
+    kinds = sorted({k for k, _ in match.searches(w)})
+    marks = ",".join("?" * len(kinds)) or "''"
+    db.run(
+        f"UPDATE listings SET active = 0 WHERE want_id = ? AND kind NOT IN ({marks})",  # nosec B608
+        w["_id"],
+        *kinds,
+    )
+
+
 def photo_check(
     db: DB, s: Settings, b: Browser | None, wants: dict[int, dict], run_id: int
 ) -> None:
@@ -426,6 +437,8 @@ def run(
             for f in found:
                 uniq.setdefault((f["item_id"], f["kind"]), f)
             store(db, run_id, list(uniq.values()), sold, searched)
+            for w in wants:
+                retire_unsearched(db, w)
             demoted = rate(db, s, run_id, by_id)
             say(f"price check: {demoted} under the ceiling but not below recent sales")
             say("photo check")
