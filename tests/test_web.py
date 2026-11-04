@@ -486,3 +486,13 @@ def test_listed_prints_pick_exactly_those_refs(tmp_path):
     w = {"set": "CSM", "who": "Aki Hayakawa", "cards": "UE22BT/CSM-1-056_p1 SR★★"}
     assert [p.name for p in photos.refs_for(w, tmp_path)] == ["UE22BT_CSM-1-056_p1.jpg"]
     assert photos.listed_rarity(w) == {"UE22BT_CSM-1-056_p1": "SR★★"}
+
+
+def test_bare_numbers_alongside_prints_keep_their_art(tmp_path):
+    for n in ("UE15BT_EVA-1-082_p1.jpg", "UE15BT_EVA-1-081_p1.jpg"):
+        (tmp_path / n).write_bytes(b"x")
+    w = {"set": "EVA", "who": "Production Model-02", "cards": "UE15BT/EVA-1-082_p1 SR★, 081"}
+    assert sorted(p.name for p in photos.refs_for(w, tmp_path)) == [
+        "UE15BT_EVA-1-081_p1.jpg",
+        "UE15BT_EVA-1-082_p1.jpg",
+    ]

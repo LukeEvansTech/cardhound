@@ -67,8 +67,10 @@ TITLE_NO = re.compile(r"\b[A-Z]{2,4}-\d-(\d{3}|AP\d{2})\b", re.I)
 
 def card_numbers(cards: str) -> set[str]:
     """Card numbers a want lists, from print ids and bare numbers ("081, 082", "UEPR 010/012")."""
-    out = {re.split(r"-", i)[-1].split("_")[0].upper() for _, i in PRINT_ID.findall(cards or "")}
-    out |= set(re.findall(r"(?<![\d-])(\d{3})(?!\d)", PRINT_ID.sub(" ", cards or "")))
+    out = {i.split("-")[-1].split("_")[0].upper() for _, i in PRINT_ID.findall(cards or "")}
+    rest = PRINT_ID.sub(" ", cards or "")
+    out |= {n.upper() for n in TITLE_NO.findall(rest)}  # EVA-1-081 without its set prefix
+    out |= set(re.findall(r"(?<![\d-])(\d{3})(?!\d)", TITLE_NO.sub(" ", rest)))
     return out
 
 

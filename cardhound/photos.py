@@ -28,11 +28,9 @@ def refs_for(w: dict, refs_dir: Path) -> list[Path]:
         return []
     cards = w.get("cards", "")
     prints = [f"{a}_{b}" for a, b in PRINT_ID.findall(cards)]
-    if prints:  # exact prints listed: those and nothing else
-        found = [refs_dir / f"{p}{ext}" for p in prints for ext in (".jpg", ".png")]
-        return [f for f in found if f.exists()]
-    nums = card_numbers(cards)
-    out = []
+    exact = [refs_dir / f"{p}{ext}" for p in prints for ext in (".jpg", ".png")]
+    out = [f for f in exact if f.exists()]  # exact prints listed: those images only
+    nums = card_numbers(PRINT_ID.sub(" ", cards))  # plus any card listed by number alone
     for f in sorted(refs_dir.glob(f"*_{tag}-*")):
         m = re.search(r"-\d-(\d{3})", f.name)
         if (
@@ -42,7 +40,7 @@ def refs_for(w: dict, refs_dir: Path) -> list[Path]:
             and ("_p" in f.name or f.name.startswith("UEPR"))
         ):
             out.append(f)
-    return out
+    return list(dict.fromkeys(out))
 
 
 def listed_rarity(w: dict) -> dict:
