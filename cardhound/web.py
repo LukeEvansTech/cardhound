@@ -387,9 +387,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         if not 1000 < len(data) < 15_000_000:
             raise HTTPException(400, "image size out of range")
         (s.refs_dir / name).write_bytes(data)
-        db.run(
-            "UPDATE listings SET art = NULL WHERE art IS NOT NULL AND art NOT LIKE '%\"match\"%'"
-        )
+        db.run("UPDATE listings SET art = NULL WHERE art IS NOT NULL")  # judge again, matches too
         return {"stored": name, "bytes": len(data)}
 
     @app.get("/api/refs")

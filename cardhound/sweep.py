@@ -190,7 +190,7 @@ def alert(db: DB, s: Settings, run_id: int, wants: dict[int, dict]) -> tuple[int
             """SELECT l.*, a.usd AS alerted_usd FROM listings l
                LEFT JOIN alerts a ON a.item_id = l.item_id AND a.kind = l.kind
                WHERE l.active = 1 AND l.deal = 1 AND l.last_run = ?
-                 AND (a.item_id IS NULL OR l.usd + coalesce(l.ship, 0) < a.usd * 0.9)""",
+                 AND (a.item_id IS NULL OR l.usd + coalesce(l.ship, 0) <= a.usd * 0.9)""",
             run_id,
         )
     ]
@@ -291,7 +291,8 @@ def load_export(db: DB, body: dict) -> dict:
     existing = {(w.get("set"), w["who"]): w["_id"] for w in db.wants()}
     for w in body.get("wants", []):
         key = (w.get("set"), w["who"])
-        db.save_want(w, existing.get(key))
+        want_id = db.save_want(w, existing.get(key))
+        db.run("UPDATE listings SET art = NULL WHERE want_id = ?", want_id)
         if key in existing:
             updated += 1
         else:
