@@ -122,7 +122,18 @@ def check(w: dict, key: str, src: str, refs_dir: Path, photos_dir: Path) -> dict
         kept = max((sc for sc, r in scored if r.name not in skip), default=0)
         if kept < MATCH:
             verdict = "unwanted"
-    return {"verdict": verdict, "score": best, "ref": ref.name, "photo": photo.name}
+    return {
+        "verdict": verdict,
+        "score": best,
+        "ref": ref.name,
+        "photo": photo.name,
+        "refs": ref_key(w, refs),
+    }
+
+
+def ref_key(w: dict, refs: list[Path]) -> list[str]:
+    """What a verdict was judged against: the art and the unticked art; a change means judge again."""
+    return sorted(r.name for r in refs) + [f"skip:{x}" for x in sorted(w.get("skip") or [])]
 
 
 def small(ref: Path) -> bool:

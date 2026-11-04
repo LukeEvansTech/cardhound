@@ -156,7 +156,14 @@ def photo_check(
             for p in photos.refs_for(w, s.refs_dir)
             if p.name not in (w.get("skip") or [])
         )
-        if old and old.get("verdict") != "unchecked" and not old.get("retry") and not stale:
+        refs_now = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+        moved = old.get("verdict") not in (None, "unchecked") and old.get("refs") != refs_now
+        if (
+            old
+            and old.get("verdict") != "unchecked"
+            and not old.get("retry")
+            and not (stale or moved)
+        ):
             continue
         res = photos.check(w, r["item_id"], r["img"], s.refs_dir, s.photos_dir)
         if res["verdict"] in ("differs", "unclear", "unwanted"):

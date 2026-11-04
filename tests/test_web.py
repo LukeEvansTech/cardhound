@@ -496,3 +496,26 @@ def test_bare_numbers_alongside_prints_keep_their_art(tmp_path):
         "UE15BT_EVA-1-081_p1.jpg",
         "UE15BT_EVA-1-082_p1.jpg",
     ]
+
+
+def test_changed_art_gets_a_cached_verdict_judged_again(env, monkeypatch):
+    s, db, client = env
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    client.post(
+        "/api/import",
+        json={"wants": [{"set": "DBS", "who": "Vegito", "q": "v", "max": {"any": 900}}]},
+    )
+    calls = []
+
+    def fake_check(w, key, *_rest):
+        calls.append(key)
+        refs = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+        return {"verdict": "differs", "score": 3, "ref": "a", "photo": "p", "refs": refs}
+
+    monkeypatch.setattr(sweep.photos, "check", fake_check)
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    first = len(calls)
+    db.run("UPDATE wants SET spec = json_set(spec, '$.skip', json(?))", '["x.jpg"]')
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    assert len(calls) > first  # unticked art changed what the verdict means

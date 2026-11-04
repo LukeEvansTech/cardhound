@@ -72,7 +72,7 @@ def card_numbers(cards: str) -> set[str]:
     card_id = re.compile(r"\b[A-Z]{2,4}-\d-(\d{3}|AP\d{2})(?:_p\d)?(?![0-9])", re.I)
     out |= {n.upper() for n in card_id.findall(rest)}  # EVA-1-081(_p1) without its set prefix
     rest = card_id.sub(" ", rest)
-    out |= {n.upper() for n in re.findall(r"(?<![\w-])(AP\d{2})(?!\d)", rest, re.I)}
+    out |= {n.upper() for n in re.findall(r"(?<![A-Za-z0-9_])(AP\d{2})(?!\d)", rest, re.I)}
     out |= set(re.findall(r"(?<!\d)(\d{3})(?!\d)", rest))  # card ids are gone; 081-082 is two
     return out
 

@@ -136,3 +136,7 @@ def test_title_parallel_suffix_and_hyphenated_lists():
     assert match.card_numbers("081-082") == {"081", "082"}
     assert not match.keep(w, "raw", "Union Arena Production Model-02 EVA-1-083_p1 SR* NM", "")
     assert match.keep(w, "raw", "Union Arena Production Model-02 EVA-1-082_p1 SR* NM", "")
+
+
+def test_hyphenated_action_point_lists():
+    assert match.card_numbers("AP03-AP04") == {"AP03", "AP04"}
