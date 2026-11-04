@@ -5,7 +5,7 @@
   <span class="badge rating-{{ r.v.rating }}">{{ r.v.rating }}</span>
   <h1>{{ r.v.headline }}</h1>
   <p class="advice">{{ r.v.advice }}</p>
-  {% set v = r.v %}{% set big = true %}{% include "_meter.html" %}
+  {% set v, kind, star, big = r.v, r.kind, r.star, true %}{% include "_meter.html" %}
   <div class="actions">
     <a class="button primary" href="https://www.ebay.com/itm/{{ r.item_id }}">Open on eBay</a>
     <a class="button" href="/wants/{{ w._id }}">Edit want</a>

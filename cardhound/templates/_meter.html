@@ -1,9 +1,9 @@
-{# landed price against the sold median: v is a Verdict; big = deal page #}
+{# landed price against the sold median: v is a Verdict, kind and star the listing's; big = deal page #}
 {% if v.market %}
 {% set pos = [[(v.market - 0.5) * 100, 0] | max, 100] | min %}
 <div class="meter{{ ' big' if big }}" role="img" aria-label="{{ '%.0f' | format(v.market * 100) }}% of the {{ v.median | money }} sold median">
   <div class="meter-track"><span class="meter-mark rating-{{ v.rating }}" style="left: {{ '%.1f' | format(pos) }}%"></span></div>
   <span class="meter-text">{{ '%.0f' | format(v.market * 100) }}% of market{% if big %} · sold median {{ v.median | money }}, range {{ v.low | money }} to {{ v.high | money }}{% endif %}</span>
 </div>
-{% elif big %}<p class="muted small">No sales of this card in the last 90 days to compare with.</p>
+{% elif big %}<p class="muted small">No {{ 'PSA 10' if kind == 'psa' else 'raw' }}{% if star and star != '-' %} {{ star | star }}{% endif %} sales of this card in the last 90 days to set this price against.</p>
 {% endif %}
