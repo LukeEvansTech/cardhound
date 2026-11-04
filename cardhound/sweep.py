@@ -42,6 +42,8 @@ def collect(b: Browser, w: dict, blocked: set[str], defaults: dict, today: str, 
         for r in (b.search(match.search_url(q, sold=True)) if sold_too else None) or []:
             if r["id"] in blocked or not match.keep(w, kind, r["title"], r["text"]):
                 continue
+            if match.money(r["price"]) <= 0:
+                continue
             sold.append(
                 {
                     "item_id": r["id"],
@@ -58,6 +60,8 @@ def collect(b: Browser, w: dict, blocked: set[str], defaults: dict, today: str, 
                 continue
             star = match.stars(r["title"])
             usd = match.money(r["price"])
+            if usd <= 0:  # price element missing or unparsed: never a $0 deal
+                continue
             ship = match.shipping(r["text"])
             cap = match.ceiling(w, kind, star, defaults)
             bids = re.search(r"\d+ bids?", r["text"])
@@ -136,14 +140,16 @@ def photo_check(
             if b is not None and pages > 0:
                 pages -= 1
                 srcs = b.item_photos(r["item_id"])[:4]
-            # Without the listing's own photos the thumbnail verdict is provisional: try again later.
-            res["retry"] = not srcs
+            checked = False
             for i, src in enumerate(srcs):
                 alt = photos.check(w, f"{r['item_id']}_{i}", src, s.refs_dir, s.photos_dir)
+                checked = checked or alt["verdict"] != "unchecked"
                 if (alt["score"] or 0) > (res["score"] or 0):
                     res = alt
                 if alt["verdict"] == "match":
                     break
+            # Until one of the listing's own photos was scored, the thumbnail verdict is provisional.
+            res["retry"] = not checked and res["verdict"] != "match"
         db.run(
             "UPDATE listings SET art = ? WHERE item_id = ? AND kind = ?",
             json.dumps(res),

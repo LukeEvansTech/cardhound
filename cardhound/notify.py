@@ -26,7 +26,8 @@ def send(urls: str, title: str, body: str, link: str = "", link_title: str = "Op
 
         a = apprise.Apprise()
         for u in targets:
-            a.add(_with_link(u, link, link_title))
+            if not a.add(_with_link(u, link, link_title)):
+                return "failed: a channel URL was rejected"
         room = 1000 - (len(link) + 1 if link else 0)
         text = f"{body[:room]}\n{link}" if link else body[:1000]
         ok = a.notify(title=title[:250], body=text)

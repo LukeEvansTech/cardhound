@@ -60,7 +60,7 @@ def pop_for(pop: list[dict], w: dict) -> list[dict]:
     hits = []
     for p in pop:
         d, s = p["descr"].lower(), p["set_name"].lower()
-        if "mari makinami" in d or (tag not in s and "promo" not in s):
+        if ("mari makinami" in d and "mari" not in words) or (tag not in s and "promo" not in s):
             continue
         if all(re.search(rf"(?<![a-z0-9]){re.escape(x)}(?![a-z0-9])", d) for x in words):
             hits.append(p)
@@ -69,7 +69,7 @@ def pop_for(pop: list[dict], w: dict) -> list[dict]:
 
 def gem_rate(w: dict, star: str, pop_rows: list[dict], set_rates: dict) -> tuple[float | None, str]:
     """Chance a raw copy grades PSA 10: the card's own pop when 10+ have been graded, else the set's."""
-    rows = [p for p in pop_rows if star == "-" or star_of(p["descr"]) in (star, "-")]
+    rows = [p for p in pop_rows if star_of(p["descr"]) == star]
     gems, total = sum(p["gems"] for p in rows), sum(p["total"] for p in rows)
     if total >= 10:
         return gems / total, f"this card's PSA pop ({gems}/{total})"

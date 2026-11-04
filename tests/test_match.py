@@ -85,3 +85,9 @@ def test_match_words_apply_with_custom_query():
     w = {"set": "FIN", "who": "Cloud", "q": "cloud psa 10", "match": "cloud strife"}
     assert not match.keep(w, "psa", "PSA 10 Tifa Lockhart", "")
     assert match.keep(w, "psa", "PSA 10 Cloud Strife surge foil", "")
+
+
+def test_hyphenated_and_triple_asterisk_stars():
+    assert match.stars("Edward 2-Star UE09BT") == "2"
+    assert match.stars("Edward SR*** serial") == "3"
+    assert match.stars("Edward SR***") == "3"

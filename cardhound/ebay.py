@@ -75,12 +75,14 @@ class Browser:
             try:
                 resp = self.page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 if resp is not None and resp.status == 200:
-                    if self.page.locator("li.s-card").count():
-                        return list(self.page.evaluate(EXTRACT))
+                    # eBay pads a no-results page with suggested listings; those are not results.
                     if self.page.locator(NO_RESULTS).count():
                         return []
                     self.page.wait_for_selector("li.s-card", timeout=15000)
-                    return list(self.page.evaluate(EXTRACT))
+                    rows = list(self.page.evaluate(EXTRACT))
+                    if rows:
+                        return rows
+                    log.debug("search attempt %d: cards without listings", attempt)
             except Exception as e:  # pylint: disable=broad-exception-caught
                 log.debug("search attempt %d failed: %s", attempt, type(e).__name__)
             self._wait()

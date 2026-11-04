@@ -56,3 +56,12 @@ def test_auction_gets_a_max_bid_under_ceiling_and_median():
     cmp = value.comps(sold("psa", "2", 500), TODAY)
     v = value.assess(listing(usd=100, ship=10, cap=400, auction=1), W, cmp, [], {}, 39.99, 6)
     assert v.max_bid == 390
+
+
+def test_gem_rate_stays_in_its_star_bucket():
+    pop = [
+        {"descr": "Edward Elric 2 Star 012", "gems": 1, "total": 10, "set_name": "x"},
+        {"descr": "Edward Elric 012", "gems": 99, "total": 100, "set_name": "x"},
+    ]
+    rate, _ = value.gem_rate(W, "2", pop, {})
+    assert rate == 0.1
