@@ -25,7 +25,8 @@ EXTRACT = """() => [...document.querySelectorAll('li.s-card')].map(c => ({
   text: c.innerText.replace(/\\s+/g, ' '),
   img: (i => i ? (i.getAttribute('src') || i.getAttribute('data-src') || '') : '')(c.querySelector('img'))
 })).filter(r => r.id && r.title && r.title !== 'Shop on eBay')"""
-ITEM_PHOTOS = """() => [...new Set([...document.querySelectorAll('img')]
+# Only the listing's own gallery: recommended items elsewhere on the page use the same image CDN.
+ITEM_PHOTOS = """() => [...new Set([...document.querySelectorAll('.ux-image-carousel img, .ux-image-filmstrip img')]
   .map(i => i.src || i.getAttribute('data-src') || '')
   .filter(s => /i\\.ebayimg\\.com\\/images\\/g\\//.test(s)).map(s => s.replace(/s-l\\d+/, 's-l1600')))]"""
 NO_RESULTS = "text=/No exact matches found/"

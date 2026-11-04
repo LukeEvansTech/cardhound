@@ -365,7 +365,11 @@ def run(
         return 0
     # The thread lock covers the server; the file lock also stops a CLI sweep overlapping it.
     lock_path = s.data_dir / "sweep.lock"
-    lock_file = open(lock_path, "w", encoding="utf-8")  # pylint: disable=consider-using-with
+    try:
+        lock_file = open(lock_path, "w", encoding="utf-8")  # pylint: disable=consider-using-with
+    except OSError:
+        LOCK.release()
+        raise
     try:
         fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
