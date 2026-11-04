@@ -70,3 +70,18 @@ def test_raw_any_ceiling():
     w = {"rawmax": {"any": 50}}
     assert match.ceiling(w, "raw", "-", DEFAULTS) == 50
     assert match.ceiling(w, "raw", "1", DEFAULTS) == 50
+
+
+def test_star_ceiling_beats_any():
+    assert match.ceiling({"max": {"1": 80, "any": 1000}}, "psa", "1", DEFAULTS) == 80
+    assert match.ceiling({"max": {"1": 80, "any": 1000}}, "psa", "2", DEFAULTS) == 1000
+
+
+def test_raw_false_skips_rawq():
+    assert match.searches({"q": "a", "rawq": "b", "raw": False}) == [("psa", "a")]
+
+
+def test_match_words_apply_with_custom_query():
+    w = {"set": "FIN", "who": "Cloud", "q": "cloud psa 10", "match": "cloud strife"}
+    assert not match.keep(w, "psa", "PSA 10 Tifa Lockhart", "")
+    assert match.keep(w, "psa", "PSA 10 Cloud Strife surge foil", "")

@@ -83,6 +83,12 @@ CREATE TABLE IF NOT EXISTS alerts (
     sent TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (item_id, kind)
 );
+CREATE TABLE IF NOT EXISTS run_alerts (
+    run_id INTEGER NOT NULL,
+    item_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    PRIMARY KEY (run_id, item_id, kind)
+);
 CREATE TABLE IF NOT EXISTS blocked (
     item_id TEXT PRIMARY KEY,
     reason TEXT NOT NULL,

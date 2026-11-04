@@ -218,7 +218,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             [
                 dict(r)
                 for r in db.all(
-                    "SELECT l.* FROM listings l JOIN alerts a ON a.item_id = l.item_id "
+                    "SELECT l.* FROM listings l JOIN run_alerts a ON a.item_id = l.item_id "
                     "AND a.kind = l.kind WHERE a.run_id = ?",
                     run_id,
                 )

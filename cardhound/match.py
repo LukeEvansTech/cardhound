@@ -78,7 +78,7 @@ def searches(w: dict) -> list[tuple[str, str]]:
     """(kind, query) pairs for one want; kind is psa or raw."""
     if "q" in w:
         out = [("psa", w["q"])]
-        if w.get("rawq"):
+        if w.get("rawq") and w.get("raw", True):
             out.append(("raw", w["rawq"]))
         return out
     if w.get("set") not in UA_SETS:
@@ -101,7 +101,8 @@ def search_url(q: str, sold: bool = False) -> str:
 def keep(w: dict, kind: str, title: str, text: str) -> bool:
     """Does this listing (title plus the search card's full text) belong to the want?"""
     t = title.lower()
-    words = (w.get("match") or w["who"]).lower().split() if "q" not in w else []
+    # A free-form query (q) drops the name check, but explicit match words still apply.
+    words = (w.get("match") or ("" if "q" in w else w["who"])).lower().split()
     if any(x not in t for x in words):
         return False
     for key in ("id", "need"):
@@ -144,8 +145,8 @@ def ceiling(w: dict, kind: str, star: str, defaults: dict) -> float | None:
         if "raw_max" in w:
             return float(w["raw_max"])
         return float(defaults["raw_1star_max"]) if star == "1" else None
-    if "any" in mx:
-        return float(mx["any"])
     if star in mx:
         return float(mx[star])
+    if "any" in mx:
+        return float(mx["any"])
     return float(defaults["psa_1star_max"]) if star == "1" else None

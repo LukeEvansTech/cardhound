@@ -243,9 +243,11 @@ def baseline(db: DB, s: Settings, run_id: int, deals: int) -> tuple[int, str]:
     )
     if res == "sent":
         for r in db.all(
-            "SELECT item_id, kind, usd FROM listings WHERE last_run = ? AND deal = 1", run_id
+            "SELECT item_id, kind, usd, art FROM listings WHERE last_run = ? AND deal = 1", run_id
         ):
-            _mark(db, dict(r), run_id)
+            # A provisional photo mismatch stays out of the ledger so a later match can alert.
+            if (json.loads(r["art"]) if r["art"] else {}).get("verdict") != "differs":
+                _mark(db, dict(r), run_id)
         db.put("baseline_done", True)
     return 0, f"baseline {res}"
 
@@ -259,6 +261,12 @@ def _mark(db: DB, r: dict, run_id: int) -> None:
         r["kind"],
         r["usd"],
         run_id,
+    )
+    db.run(
+        "INSERT OR IGNORE INTO run_alerts (run_id, item_id, kind) VALUES (?, ?, ?)",
+        run_id,
+        r["item_id"],
+        r["kind"],
     )
 
 
@@ -340,9 +348,10 @@ def run(
     """Run one sweep; returns the run id. Refuses (returns 0) while another sweep is running."""
     if not LOCK.acquire(blocking=False):  # pylint: disable=consider-using-with
         return 0
-    run_id = db.run("INSERT INTO runs (trigger) VALUES (?)", trigger)
+    run_id = 0
     say = progress or (lambda m: log.info("%s", m))
     try:
+        run_id = db.run("INSERT INTO runs (trigger) VALUES (?)", trigger)
         wants = db.wants(enabled_only=True)
         if only:
             subs = [o.strip().lower() for o in only.split(",") if o.strip()]
@@ -371,7 +380,7 @@ def run(
         row = db.one("SELECT count(*) AS n FROM listings WHERE last_run = ? AND deal = 1", run_id)
         deals = row["n"] if row else 0
         first = not db.get("baseline_done", False)
-        if n == 0:
+        if not searched:
             sent, status = 0, "nothing searched"
         elif notify_on and first and not only:
             sent, status = baseline(db, s, run_id, deals)
@@ -395,6 +404,8 @@ def run(
         say(f"done: {len(uniq)} listings, {deals} deals, {sent} alerted ({status})")
     except Exception as e:
         log.exception("sweep failed")
+        if not run_id:
+            raise
         db.run(
             "UPDATE runs SET finished = datetime('now'), status = 'error', error = ? WHERE id = ?",
             f"{type(e).__name__}: {e}"[:500],

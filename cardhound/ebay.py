@@ -28,7 +28,7 @@ EXTRACT = """() => [...document.querySelectorAll('li.s-card')].map(c => ({
 ITEM_PHOTOS = """() => [...new Set([...document.querySelectorAll('img')]
   .map(i => i.src || i.getAttribute('data-src') || '')
   .filter(s => /i\\.ebayimg\\.com\\/images\\/g\\//.test(s)).map(s => s.replace(/s-l\\d+/, 's-l1600')))]"""
-NO_RESULTS = "text=/No exact matches found|0 results/"
+NO_RESULTS = "text=/No exact matches found/"
 
 
 class Browser:

@@ -164,8 +164,10 @@ def assess(
                 f"Buying raw and grading is cheaper (~${grade_cost:,.0f} per 10 against ${total:,.0f}), "
                 "but takes weeks and the gem rate is a gamble."
             )
-        elif rating in ("great", "good"):
+        elif rating in ("great", "good") and ten:
             advice = "Buy the slab: the price is below what PSA 10s have been selling for."
+        elif rating == "good":
+            advice = "Under your ceiling, but there are no PSA 10 sales to compare it with."
         elif rating == "fair":
             advice = "Fair market price. Buy if you want it now; otherwise offer below the median."
         elif rating == "high":

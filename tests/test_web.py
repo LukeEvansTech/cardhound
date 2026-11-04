@@ -216,3 +216,15 @@ def test_form_error_keeps_values(env):
     )
     assert "not a valid regular expression" in r.text
     assert 'value="45"' in r.text and 'value="cloud.jpg"' in r.text
+
+
+def test_run_page_keeps_its_deals_after_a_later_price_drop(env, monkeypatch):
+    s, db, client = env
+    client.post(
+        "/api/import",
+        json={"wants": [{"set": "DBS", "who": "Vegito", "q": "v", "max": {"any": 900}}]},
+    )
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    run1 = sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    sweep.run(db, s, browser=lambda: FakeBrowser([{**ROW, "price": "$500.00"}]))
+    assert "Vegito" in client.get(f"/run/{run1}").text
