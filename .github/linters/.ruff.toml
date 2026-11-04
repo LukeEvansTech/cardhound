@@ -1,0 +1,14 @@
+# Keep Ruff and Black (.github/linters/.python-black) agreed on line width.
+# 100 matches how the tool was formatted in its previous home (the containers
+# monorepo, MegaLinter with ruff+black at line-length 100), so the move does
+# not reflow proven code.
+line-length = 100
+target-version = "py312"
+
+[lint]
+# Pin the classic default rule set explicitly — newer Ruff releases widened
+# their defaults (BLE/DTZ/PLR/FURB...), and the tool moved here as-proven
+# from the containers monorepo, which linted it with exactly these rules.
+# Adopting a wider ruleset is a deliberate follow-up, not a side effect of
+# whichever Ruff version a linter bundles.
+select = ["E4", "E7", "E9", "F"]

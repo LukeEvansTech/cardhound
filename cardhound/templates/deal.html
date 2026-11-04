@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ r.v.headline }} · cardhound{% endblock %}
+{% block body %}
+<section class="verdict rating-{{ r.v.rating }}">
+  <span class="badge rating-{{ r.v.rating }}">{{ r.v.rating }}</span>
+  <h1>{{ r.v.headline }}</h1>
+  <p class="advice">{{ r.v.advice }}</p>
+  <div class="actions">
+    <a class="button primary" href="https://www.ebay.com/itm/{{ r.item_id }}">Open on eBay</a>
+    <a class="button" href="/wants/{{ w._id }}">Edit want</a>
+  </div>
+  {% if not r.active %}<p class="warn">This listing was not in the latest search: it may have sold or ended.</p>{% endif %}
+</section>
+
+<section class="pics">
+  <figure>
+    {% if r.artd.photo %}<img src="/photos/{{ r.artd.photo }}" alt="Listing photo">{% else %}<img src="{{ r.img | ebay_img(1600) }}" alt="Listing photo">{% endif %}
+    <figcaption>Listing photo{% if r.artd.verdict and r.artd.verdict != 'unchecked' %}: photo check <b class="{{ 'ok' if r.artd.verdict == 'match' else 'warn' }}">{{ r.artd.verdict }}</b> (score {{ r.artd.score }}){% endif %}</figcaption>
+  </figure>
+  {% for ref in refs[:3] %}
+  <figure class="{{ 'best' if ref == r.artd.ref }}">
+    <img src="/refs/{{ ref }}" alt="Official art">
+    <figcaption>Official art{% if ref == r.artd.ref %} (best match){% endif %}</figcaption>
+  </figure>
+  {% else %}
+  <figure class="noref"><figcaption>No official art on file for this card, so the photo was not checked.</figcaption></figure>
+  {% endfor %}
+</section>
+<p class="muted small">Photo check compares the art only: a match means the same image, not that the card is genuine. Check the cert before buying a slab.</p>
+
+<section>
+  <h2>The listing</h2>
+  <table class="facts">
+    <tr><th>Title</th><td>{{ r.title }}</td></tr>
+    <tr><th>Price</th><td>{{ r.usd | money }}{% if r.ship is not none %} + {{ r.ship | money if r.ship else 'free' }} delivery{% endif %} = <b>{{ r.v.total | money }}</b></td></tr>
+    <tr><th>Your ceiling</th><td>{{ r.cap | money if r.cap else 'none set for this star bucket' }}</td></tr>
+    {% if r.auction %}<tr><th>Auction</th><td>{{ r.bids }} · {{ r.time_left }} left{% if r.v.max_bid %} · snipe up to <b>{{ r.v.max_bid | money }}</b>{% endif %}</td></tr>{% endif %}
+    {% if r.obo %}<tr><th>Best Offer</th><td>Accepts offers</td></tr>{% endif %}
+    <tr><th>Seen</th><td>first {{ r.first_seen }}, last {{ r.last_seen }}{% if r.low_usd and r.low_usd < r.usd %}, lowest {{ r.low_usd | money }}{% endif %}</td></tr>
+    {% if alerted %}<tr><th>Alerted</th><td>{{ alerted.sent }} UTC at {{ alerted.usd | money }}</td></tr>{% endif %}
+  </table>
+</section>
+
+<section>
+  <h2>Why</h2>
+  <ul class="reasons">{% for x in r.v.reasons %}<li>{{ x }}</li>{% endfor %}</ul>
+</section>
+
+<section>
+  <h2>Sold prices, 90 days</h2>
+  {% if card_comps %}
+  <table class="list">
+    <tr><th>Kind</th><th>Star</th><th>Median</th><th>Sales</th><th>Range</th><th>Last</th></tr>
+    {% for kind, star, c in card_comps %}
+    <tr><td>{{ 'PSA 10' if kind == 'psa' else 'raw' }}</td><td>{{ star | star or '?' }}</td><td>{{ c.median | money }}</td><td>{{ c.count }}</td><td>{{ c.low | money }} to {{ c.high | money }}</td><td>{{ c.last }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">No sales recorded for this card yet.</p>{% endif %}
+  {% if recent %}
+  <details><summary>Latest sales</summary>
+  <ul class="plain">{% for x in recent %}<li>{{ x.date }} · {{ 'PSA 10' if x.kind == 'psa' else 'raw' }} {{ x.star | star }} · {{ x.usd | money }} · <a href="https://www.ebay.com/itm/{{ x.item_id }}">{{ x.title[:80] }}</a></li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+</section>
+
+{% if pop %}
+<section>
+  <h2>PSA population</h2>
+  <table class="list">
+    <tr><th>Card</th><th>PSA 10s</th><th>Graded</th><th>Gem rate</th></tr>
+    {% for p in pop %}<tr><td>{{ p.descr }}</td><td>{{ p.gems }}</td><td>{{ p.total }}</td><td>{{ '%.0f%%' | format(100 * p.gems / p.total) if p.total else '' }}</td></tr>{% endfor %}
+  </table>
+  <p class="muted small">GemRate, fetched {{ pop[0].fetched }}.</p>
+</section>
+{% endif %}
+
+<section>
+  <h2>Other live listings of this card</h2>
+  {% if others %}<div class="grid">{% for r in others %}{% include "_card.html" %}{% endfor %}</div>{% else %}<p class="muted">None.</p>{% endif %}
+</section>
+
+<section>
+  <h2>Look elsewhere</h2>
+  <ul class="links">{% for label, href in links %}<li><a href="{{ href }}">{{ label }}</a></li>{% endfor %}</ul>
+</section>
+
+<section>
+  <h2>Not interested?</h2>
+  <form method="post" action="/deal/{{ r.item_id }}/{{ r.kind }}/block" class="inline">
+    <input name="reason" placeholder="Reason (fake, wrong card, seller)" required>
+    <button>Block this listing</button>
+  </form>
+</section>
+{% endblock %}

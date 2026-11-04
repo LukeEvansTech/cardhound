@@ -1,0 +1,4 @@
+# Check rows pr-merge-when-green waits for when none are passed (one per line).
+lint / lint
+test
+build-and-push

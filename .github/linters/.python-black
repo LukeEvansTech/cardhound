@@ -1,0 +1,4 @@
+[tool.black]
+# Match .ruff.toml — 100 is how this code was formatted in the containers
+# monorepo it moved out of, so Black does not reflow proven code.
+line-length = 100
