@@ -91,6 +91,7 @@ def check(w: dict, key: str, src: str, refs_dir: Path, photos_dir: Path) -> dict
         return none
     best, ref = max(((score(photo, r), r) for r in refs), key=lambda x: x[0])
     if best < 0:  # an image that would not decode is not evidence either way
+        photo.unlink(missing_ok=True)  # so the next sweep downloads it again
         return none
     verdict = "match" if best >= MATCH else "differs" if best < DIFFERS else "unclear"
     return {"verdict": verdict, "score": best, "ref": ref.name, "photo": photo.name}

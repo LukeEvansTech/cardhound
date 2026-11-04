@@ -65,6 +65,7 @@ US_ZIP = "97035"  # the Oregon forwarding address: eBay prices shipping and elig
 def stars(title: str) -> str:
     """Star bucket from a listing title: 3 (serial), 2 (signature), 1 (alt art), - (none)."""
     t = re.sub(r"(\d)\s*-\s*star", r"\1 star", title.lower())
+    t = re.sub(r"\b([123])\s*[★☆]", r"\1 star", t)
     if re.search(r"3 ?stars?|★★★|☆☆☆|sr\*\*\*|serial", t):
         return "3"
     if re.search(r"2 ?stars?|★★|☆☆|sr\*\*|signature", t):

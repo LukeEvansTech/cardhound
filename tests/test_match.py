@@ -91,3 +91,8 @@ def test_hyphenated_and_triple_asterisk_stars():
     assert match.stars("Edward 2-Star UE09BT") == "2"
     assert match.stars("Edward SR*** serial") == "3"
     assert match.stars("Edward SR***") == "3"
+
+
+def test_digit_star_symbol():
+    assert match.stars("Edward 2★ UE09BT") == "2"
+    assert match.stars("Edward 3☆ serial") == "3"

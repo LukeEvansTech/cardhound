@@ -7,6 +7,7 @@ on the next sweep instead of being lost.
 from __future__ import annotations
 
 import datetime as dt
+import fcntl
 import json
 import logging
 import re
@@ -362,6 +363,15 @@ def run(
     """Run one sweep; returns the run id. Refuses (returns 0) while another sweep is running."""
     if not LOCK.acquire(blocking=False):  # pylint: disable=consider-using-with
         return 0
+    # The thread lock covers the server; the file lock also stops a CLI sweep overlapping it.
+    lock_path = s.data_dir / "sweep.lock"
+    lock_file = open(lock_path, "w", encoding="utf-8")  # pylint: disable=consider-using-with
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        lock_file.close()
+        LOCK.release()
+        return 0
     run_id = 0
     say = progress or (lambda m: log.info("%s", m))
     try:
@@ -426,5 +436,6 @@ def run(
             run_id,
         )
     finally:
+        lock_file.close()
         LOCK.release()
     return run_id

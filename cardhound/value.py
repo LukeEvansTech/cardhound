@@ -183,6 +183,11 @@ def assess(
                     f"Grading this costs ~${grade_cost:,.0f} per 10, close to the ${ten.median:,.0f} "
                     "slab median: buy the slab instead unless you want the raw."
                 )
+        elif rating in ("great", "good") and ten:
+            advice = (
+                f"Good raw price. No gem rate for {w.get('set', 'this set')} yet, so the cost of "
+                f"grading it cannot be set against the ${ten.median:,.0f} slab median."
+            )
         elif rating in ("great", "good"):
             advice = "Good raw price. No PSA 10 sales yet to compare a graded copy against."
         else:
