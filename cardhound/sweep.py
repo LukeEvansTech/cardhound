@@ -167,8 +167,7 @@ def photo_check(
 def rate(db: DB, s: Settings, run_id: int, wants: dict[int, dict]) -> int:
     """Drop deals the sold comps say are fair or high; returns how many were dropped."""
     rows = [
-        dict(r)
-        for r in db.all("SELECT * FROM listings WHERE last_run = ? AND deal = 1", run_id)
+        dict(r) for r in db.all("SELECT * FROM listings WHERE last_run = ? AND deal = 1", run_id)
     ]
     if not rows:
         return 0

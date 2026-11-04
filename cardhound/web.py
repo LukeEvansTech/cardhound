@@ -477,7 +477,18 @@ def form_echo(form: dict, want_id: int | None) -> dict:
 
 
 FORM_KEYS = {
-    "set", "who", "q", "rawq", "need", "id", "max", "rawmax", "refs", "cards", "notes", "skip"
+    "set",
+    "who",
+    "q",
+    "rawq",
+    "need",
+    "id",
+    "max",
+    "rawmax",
+    "refs",
+    "cards",
+    "notes",
+    "skip",
 }
 
 

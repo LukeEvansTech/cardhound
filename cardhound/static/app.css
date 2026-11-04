@@ -483,7 +483,7 @@ textarea {
   cursor: pointer;
 }
 
-.art input {
+.art-pick .art input {
   position: absolute;
   top: 6px;
   left: 6px;
@@ -518,6 +518,6 @@ textarea {
   margin-right: 14px;
 }
 
-.defaults input {
+.defaults .mini input {
   width: 6rem;
 }
