@@ -1,0 +1,148 @@
+"""Which eBay listings count for a want, and what it would pay for them.
+
+A want is a dict (stored as JSON in the wants table). Keys, all optional except set and who:
+
+    set       short tag for the game or set: FMA, EVA, CSM, AOT (Union Arena), DBS, FIN, TLA, ...
+    who       display name; for Union Arena wants also the words a title must contain
+    match     words that must all appear in the title, overriding who
+    q / rawq  free-form eBay query for the PSA search / the raw search (anything not Union Arena)
+    id        regex the title must match (card number or name)
+    need      another regex the title must match
+    max       PSA ceilings in USD by star bucket: {"1": 80, "2": 800, "3": ..., "any": ...}
+    rawmax    raw ceilings by star bucket; raw_max a flat raw ceiling
+    raw       false to skip the raw search
+    nostar    raw listings with no star marker still count
+    needstar  PSA listings must carry a star marker
+    refs      official-art filenames for the photo check
+    cards     free-text card numbers ("011, 012 (1★, 2★)") used to find Union Arena refs
+    pop       {"term": ..., "row": regex} picks this card's PSA pop rows
+"""
+
+from __future__ import annotations
+
+import re
+import urllib.parse
+
+FOREIGN = re.compile(
+    r"japan|\bjp\b|\bjpn\b|japanese|chinese|korean|\bfrench\b|german|italian|ua\d\dbt|uapr|"
+    r"ua37|ua44|ex\d\dbt|\bsao\b|proxy|custom|orica|fan ?art|playmat|sleeve",
+    re.I,
+)
+FOREIGN_SELLER = re.compile(
+    r"(Located in|from) (Japan|Hong Kong|China|Korea|Taiwan|Germany|France|Italy|"
+    r"Spain|Belgium|Netherlands|Australia|United Kingdom)"
+)
+GRADED = re.compile(r"\b(psa|bgs|cgc|tag|ace|beckett|sgc|ars)\b", re.I)
+
+# Union Arena sets the character wants cover: eBay OR-words for the PSA search, the set name for raw
+# searches, and the title hint a listing must carry to count.
+UA_SETS = {
+    "FMA": {
+        "words": '(fma,fullmetal,alchemist,ue09bt,"union arena")',
+        "raw": "fullmetal alchemist",
+        "hint": r"union arena|ue09|uepr|fma-1",
+    },
+    "EVA": {
+        "words": '(evangelion,ue15bt,"union arena")',
+        "raw": "evangelion",
+        "hint": r"union arena|ue15|uepr|eva-1",
+    },
+    "CSM": {
+        "words": '("chainsaw man",csm,ue22bt,"union arena")',
+        "raw": "chainsaw man",
+        "hint": r"union arena|ue22|uepr|csm-1",
+    },
+    "AOT": {
+        "words": '("attack on titan",aot,ue10bt,uex07bt,"union arena")',
+        "raw": "attack on titan",
+        "hint": r"union arena|ue10|uex07|uepr|aot-[12]",
+    },
+}
+SET_HINT = {k: re.compile(v["hint"], re.I) for k, v in UA_SETS.items()}
+US_ZIP = "97035"  # the Oregon forwarding address: eBay prices shipping and eligibility for it
+
+
+def stars(title: str) -> str:
+    """Star bucket from a listing title: 3 (serial), 2 (signature), 1 (alt art), - (none)."""
+    t = title.lower()
+    if re.search(r"3 ?stars?|★★★|☆☆☆|serial", t):
+        return "3"
+    if re.search(r"2 ?stars?|★★|☆☆|sr\*\*|signature", t):
+        return "2"
+    if re.search(r"1 ?star|alt(ernate)? ?art|parallel|★|☆|\*", t):
+        return "1"
+    return "-"
+
+
+def searches(w: dict) -> list[tuple[str, str]]:
+    """(kind, query) pairs for one want; kind is psa or raw."""
+    if "q" in w:
+        out = [("psa", w["q"])]
+        if w.get("rawq"):
+            out.append(("raw", w["rawq"]))
+        return out
+    if w.get("set") not in UA_SETS:
+        return []
+    name = w.get("match") or w["who"]
+    ua = UA_SETS[w["set"]]
+    out = [("psa", f"{name} psa 10 {ua['words']}")]
+    if w.get("raw", True):
+        out.append(("raw", f"union arena {ua['raw']} {name} -psa -bgs -cgc -tag"))
+    return out
+
+
+def search_url(q: str, sold: bool = False) -> str:
+    p = {"_nkw": q, "_ipg": "240", "_sop": "15", "_stpos": US_ZIP}
+    if sold:
+        p |= {"LH_Sold": "1", "LH_Complete": "1", "_sop": "13"}
+    return "https://www.ebay.com/sch/i.html?" + urllib.parse.urlencode(p)
+
+
+def keep(w: dict, kind: str, title: str, text: str) -> bool:
+    """Does this listing (title plus the search card's full text) belong to the want?"""
+    t = title.lower()
+    words = (w.get("match") or w["who"]).lower().split() if "q" not in w else []
+    if any(x not in t for x in words):
+        return False
+    for key in ("id", "need"):
+        if w.get(key) and not re.search(w[key], t, re.I):
+            return False
+    if w.get("set") in SET_HINT and not SET_HINT[w["set"]].search(t):
+        return False
+    if FOREIGN.search(t) or FOREIGN_SELLER.search(text):
+        return False
+    if w.get("set") == "DBS" and re.search(r"signed|autograph|\bauto\b|sabat|schemmel|nadolny", t):
+        return False  # voice-actor autographs, not the printed Masters signature SPR
+    if w.get("needstar") and stars(title) == "-":
+        return False
+    if kind == "psa":
+        return bool(re.search(r"psa ?10|psa gem", t))
+    return not GRADED.search(t) and (bool(w.get("nostar")) or stars(title) != "-")
+
+
+def money(s: str) -> float:
+    m = re.search(r"[\d,]+\.?\d*", s or "")
+    return float(m.group(0).replace(",", "")) if m else 0.0
+
+
+def shipping(text: str) -> float | None:
+    """Delivery cost from a search card's text; 0 for free delivery, None when not shown."""
+    if re.search(r"free (delivery|shipping)", text, re.I):
+        return 0.0
+    m = re.search(r"\+\s*\$([\d,]+\.?\d*)\s*(delivery|shipping)", text, re.I)
+    return float(m.group(1).replace(",", "")) if m else None
+
+
+def ceiling(w: dict, kind: str, star: str, defaults: dict) -> float | None:
+    mx = w.get("max", {})
+    if kind == "raw":
+        if star in w.get("rawmax", {}):
+            return float(w["rawmax"][star])
+        if "raw_max" in w:
+            return float(w["raw_max"])
+        return float(defaults["raw_1star_max"]) if star == "1" else None
+    if "any" in mx:
+        return float(mx["any"])
+    if star in mx:
+        return float(mx[star])
+    return float(defaults["psa_1star_max"]) if star == "1" else None

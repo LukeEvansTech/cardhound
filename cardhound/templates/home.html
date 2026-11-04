@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="head-row">
+  <h1>{{ 'Deals' if show == 'deals' else 'All live listings' }} <span class="muted">({{ total }})</span></h1>
+  <p class="muted">
+    {% if running %}A sweep is running now. {% endif %}
+    {% if last %}Last sweep #{{ last.id }} {{ last.status }}, started {{ last.started }} UTC: {{ last.listings }} listings, {{ last.deals }} deals.{% else %}No sweep yet: <a href="/ops">start one</a> or add cards.{% endif %}
+  </p>
+</section>
+<form class="filters" method="get">
+  <select name="show">
+    <option value="deals" {{ 'selected' if show == 'deals' }}>Deals only</option>
+    <option value="all" {{ 'selected' if show == 'all' }}>All live listings</option>
+  </select>
+  <select name="set">
+    <option value="">All sets</option>
+    {% for x in sets %}<option {{ 'selected' if x == cur_set }}>{{ x }}</option>{% endfor %}
+  </select>
+  <select name="kind">
+    <option value="">PSA 10 and raw</option>
+    <option value="psa" {{ 'selected' if kind == 'psa' }}>PSA 10 only</option>
+    <option value="raw" {{ 'selected' if kind == 'raw' }}>Raw only</option>
+  </select>
+  <button>Filter</button>
+</form>
+<div class="grid">
+{% for r in rows %}{% include "_card.html" %}{% else %}<p class="muted">Nothing here yet.</p>{% endfor %}
+</div>
+{% endblock %}

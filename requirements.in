@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+playwright
+opencv-python-headless
+numpy
+apprise
+croniter

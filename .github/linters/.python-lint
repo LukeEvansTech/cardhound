@@ -1,0 +1,50 @@
+# Pylint config for cardhound. Read by super-linter (PYTHON_PYLINT_CONFIG_FILE defaults to this path).
+[MASTER]
+init-hook='import sys; sys.path.insert(0, ".")'
+
+[TYPECHECK]
+# OpenCV's members are defined in a compiled module pylint cannot read.
+generated-members=cv2.*
+
+[FORMAT]
+max-line-length = 100
+
+[MESSAGES CONTROL]
+# Disabled with rationale:
+#   C0103              invalid-name: short names (w, r, s, db) for the want, row and settings
+#                      objects every function passes around.
+#   C0114/C0115/C0116  missing docstrings: pedantic for route handlers and tests.
+#   C0301              line-too-long: Black/Ruff-format own code width.
+#   C0411              wrong-import-order: isort owns import order.
+#   C0415              import-outside-toplevel: heavy modules (cv2, playwright, uvicorn) load
+#                      only on the code path that needs them, so tests and the web UI start fast.
+#   E0401              import-error: super-linter's container doesn't install requirements.txt.
+#   R0801              duplicate-code: disabled fleet-wide.
+#   R0902/R0903        too-many/few attributes or public methods: dataclasses and test fakes.
+#   R0911-R0917        too-many returns, branches, locals, statements, arguments: the verdict
+#                      and route functions are linear rule lists, clearer unsplit.
+#   W0621              redefined-outer-name: pytest fixtures.
+#   W0622              redefined-builtin: `set` is a query parameter name in the routes.
+#   W0718              broad-exception-caught: browser loads and alert sends fail in many shapes
+#                      and every handler records the failure instead of crashing a sweep.
+disable =
+    C0103,
+    C0114,
+    C0115,
+    C0116,
+    C0301,
+    C0411,
+    C0415,
+    E0401,
+    R0801,
+    R0902,
+    R0903,
+    R0911,
+    R0912,
+    R0913,
+    R0914,
+    R0915,
+    R0917,
+    W0621,
+    W0622,
+    W0718,

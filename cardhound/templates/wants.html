@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Wants · cardhound{% endblock %}
+{% block body %}
+<section class="head-row">
+  <h1>Wants <span class="muted">({{ wants | length }})</span></h1>
+  <a class="button primary" href="/wants/new">Add card</a>
+</section>
+<form class="filters" method="get">
+  <select name="set" onchange="this.form.submit()">
+    <option value="">All sets</option>
+    {% for x in sets %}<option {{ 'selected' if x == cur_set }}>{{ x }}</option>{% endfor %}
+  </select>
+</form>
+<table class="list">
+  <tr><th>Set</th><th>Card</th><th>PSA ceiling</th><th>Raw ceiling</th><th>Live</th><th>Deals</th><th></th></tr>
+  {% for w in wants %}
+  {% set c = counts.get(w._id, (0, 0)) %}
+  <tr class="{{ '' if w._enabled else 'off' }}">
+    <td>{{ w.set }}</td>
+    <td><a href="/wants/{{ w._id }}">{{ w.who }}</a>{% if w.cards %} <span class="muted small">{{ w.cards }}</span>{% endif %}</td>
+    <td>{% for k, v in (w.max or {}).items() %}{{ k | star or k }} {{ v | money }} {% endfor %}</td>
+    <td>{% for k, v in (w.rawmax or {}).items() %}{{ k | star }} {{ v | money }} {% endfor %}{% if w.raw_max %}{{ w.raw_max | money }}{% endif %}</td>
+    <td>{{ c[0] }}</td>
+    <td>{{ c[1] or 0 }}</td>
+    <td>{{ '' if w._enabled else 'paused' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,5 @@
+[flake8]
+max-line-length = 100
+# E203/W503: black-compatible. E501: Black/Ruff-format are the sole authority
+# on code line width.
+extend-ignore = E203,W503,E501
