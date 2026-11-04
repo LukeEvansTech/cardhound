@@ -59,7 +59,7 @@ UA_SETS = {
     },
 }
 SET_HINT = {k: re.compile(v["hint"], re.I) for k, v in UA_SETS.items()}
-# A Union Arena print in a want's card list, e.g. UE22BT/CSM-1-056_p1 (set, card id, parallel).
+# A Union Arena print in the card list of a want, e.g. UE22BT/CSM-1-056_p1 (set, card id, parallel).
 PRINT_ID = re.compile(r"\b([A-Z0-9]+)/([A-Z]+-(?:\d-)?(?:\d{3}|AP\d{2})(?:_p\d)?)")
 # The card number a seller writes in a title, e.g. EVA-1-083 or CSM-1-AP03.
 TITLE_NO = re.compile(r"\b[A-Z]{2,4}-\d-(\d{3}|AP\d{2})\b", re.I)

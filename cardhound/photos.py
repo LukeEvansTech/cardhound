@@ -46,7 +46,7 @@ def refs_for(w: dict, refs_dir: Path) -> list[Path]:
 
 
 def listed_rarity(w: dict) -> dict:
-    """{image stem: rarity} as the want's card list writes it ("UE22BT/CSM-1-056_p1 SR★★")."""
+    """{image stem: rarity} as the card list of the want writes it ("UE22BT/CSM-1-056_p1 SR★★")."""
     out = {}
     for m in re.finditer(PRINT_ID.pattern + r"\s+([A-Z]{1,3}★*)(?=[\s,]|$)", w.get("cards", "")):
         out[f"{m.group(1)}_{m.group(2)}"] = m.group(3)
