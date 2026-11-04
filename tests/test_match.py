@@ -129,3 +129,10 @@ def test_card_numbers_read_parallels_and_action_points():
     assert match.keep(w, "psa", "PSA 10 Union Arena Chainsaw Man CSM-1-AP03 Action Point", "")
     odd = {"set": "EVA", "who": "Rei", "cards": "the blue one"}  # nothing readable: no check
     assert match.keep(odd, "raw", "Union Arena Rei Ayanami UE15BT/EVA-1-010 R* NM", "")
+
+
+def test_title_parallel_suffix_and_hyphenated_lists():
+    w = {"set": "EVA", "who": "Production Model-02", "cards": "081-082"}
+    assert match.card_numbers("081-082") == {"081", "082"}
+    assert not match.keep(w, "raw", "Union Arena Production Model-02 EVA-1-083_p1 SR* NM", "")
+    assert match.keep(w, "raw", "Union Arena Production Model-02 EVA-1-082_p1 SR* NM", "")
