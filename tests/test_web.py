@@ -96,6 +96,11 @@ def test_want_form_validates(env):
     assert "need an eBay search" in r.text
     r = client.post(
         "/wants",
+        data={"who": "Cloud", "set": "FIN", "q": "c", "max_any": "inf", "extra": "{}"},
+    )
+    assert "zero or more" in r.text
+    r = client.post(
+        "/wants",
         data={
             "who": "Cloud",
             "set": "FIN",

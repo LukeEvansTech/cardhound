@@ -83,3 +83,8 @@ def test_max_bid_never_rounds_past_the_cutoff():
     v = value.assess(listing(usd=50, cap=1000, auction=1), W, cmp, [], {}, 39.99, 6)
     assert v.max_bid == 128
     assert value.assess(listing(usd=v.max_bid, cap=1000), W, cmp, [], {}, 39.99, 6).is_deal
+
+
+def test_infinite_ceiling_gives_no_bid_rather_than_crashing():
+    v = value.assess(listing(usd=50, cap=float("inf"), auction=1), W, {}, [], {}, 39.99, 6)
+    assert v.max_bid is None

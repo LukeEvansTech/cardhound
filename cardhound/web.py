@@ -535,6 +535,8 @@ def spec_from_form(form: dict) -> dict:
                     vals[b] = float(raw)
                 except ValueError as e:
                     raise ValueError(f"Ceiling '{raw}' is not a number") from e
+                if not math.isfinite(vals[b]) or vals[b] < 0:
+                    raise ValueError(f"Ceiling '{raw}' must be a number of zero or more")
         if vals:
             spec[key] = vals
         else:

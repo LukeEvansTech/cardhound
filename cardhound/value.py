@@ -206,11 +206,16 @@ def assess(
     if listing.get("auction"):
         # Keep the bid inside what still counts as a deal (Verdict.is_deal): "good" or better against
         # the same kind's sold median, or for a raw copy, grading under 85% of the PSA 10 median.
-        anchors = [x for x in (cap, ten.median * 0.92 if kind == "psa" and ten else None) if x]
+        anchors = [
+            x
+            for x in (cap, ten.median * 0.92 if kind == "psa" and ten else None)
+            if x and math.isfinite(x)
+        ]
         if kind == "raw" and ten and rate:
             anchors.append(ten.median * 0.84 * rate - fee - grade_ship)
         elif kind == "raw" and raw:
             anchors.append(raw.median * 0.92)
+        anchors = [x for x in anchors if math.isfinite(x)]
         if anchors:
             max_bid = float(max(0, math.floor(min(anchors) - (ship or 0))))  # never round up
             advice += f" Auction: a snipe up to ${max_bid:,.0f} keeps it a deal."
