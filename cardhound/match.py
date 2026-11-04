@@ -59,6 +59,24 @@ UA_SETS = {
     },
 }
 SET_HINT = {k: re.compile(v["hint"], re.I) for k, v in UA_SETS.items()}
+# A Union Arena print in the card list of a want, e.g. UE22BT/CSM-1-056_p1 (set, card id, parallel).
+PRINT_ID = re.compile(r"\b([A-Z0-9]+)/([A-Z]+-(?:\d-)?(?:\d{3}|AP\d{2})(?:_p\d)?)")
+# The card number a seller writes in a title, e.g. EVA-1-083 or CSM-1-AP03.
+TITLE_NO = re.compile(r"\b[A-Z]{2,4}-\d-(\d{3}|AP\d{2})(?:_p\d)?(?![0-9A-Za-z])", re.I)
+
+
+def card_numbers(cards: str) -> set[str]:
+    """Card numbers a want lists, from print ids and bare numbers ("081, 082", "UEPR 010/012")."""
+    out = {i.split("-")[-1].split("_")[0].upper() for _, i in PRINT_ID.findall(cards or "")}
+    rest = PRINT_ID.sub(" ", cards or "")
+    card_id = re.compile(r"\b[A-Z]{2,4}-\d-(\d{3}|AP\d{2})(?:_p\d)?(?![0-9])", re.I)
+    out |= {n.upper() for n in card_id.findall(rest)}  # EVA-1-081(_p1) without its set prefix
+    rest = card_id.sub(" ", rest)
+    out |= {n.upper() for n in re.findall(r"(?<![A-Za-z0-9_])(AP\d{2})(?!\d)", rest, re.I)}
+    out |= set(re.findall(r"(?<!\d)(\d{3})(?!\d)", rest))  # card ids are gone; 081-082 is two
+    return out
+
+
 US_ZIP = "97035"  # the Oregon forwarding address: eBay prices shipping and eligibility for it
 
 
@@ -111,6 +129,12 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
             return False
     if w.get("set") in SET_HINT and not SET_HINT[w["set"]].search(t):
         return False
+    if w.get("set") in UA_SETS and w.get("cards"):
+        # A title naming a card number the want doesn't list is another card (083, not 081/082).
+        seen = {n.upper() for n in TITLE_NO.findall(title)}
+        listed = card_numbers(w["cards"])
+        if seen and listed and not seen & listed:  # no readable numbers: no check
+            return False
     if FOREIGN.search(t) or FOREIGN_SELLER.search(text):
         return False
     if w.get("set") == "DBS" and re.search(r"signed|autograph|\bauto\b|sabat|schemmel|nadolny", t):

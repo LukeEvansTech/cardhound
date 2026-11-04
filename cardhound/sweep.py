@@ -156,7 +156,14 @@ def photo_check(
             for p in photos.refs_for(w, s.refs_dir)
             if p.name not in (w.get("skip") or [])
         )
-        if old and old.get("verdict") != "unchecked" and not old.get("retry") and not stale:
+        refs_now = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+        moved = old.get("verdict") not in (None, "unchecked") and old.get("refs") != refs_now
+        if (
+            old
+            and old.get("verdict") != "unchecked"
+            and not old.get("retry")
+            and not (stale or moved)
+        ):
             continue
         res = photos.check(w, r["item_id"], r["img"], s.refs_dir, s.photos_dir)
         if res["verdict"] in ("differs", "unclear", "unwanted"):
@@ -323,7 +330,7 @@ def _mark(db: DB, r: dict, run_id: int) -> None:
 
 
 def load_export(db: DB, body: dict) -> dict:
-    """Load {wants, defaults, gem_rates, block, pop: {fetched, rows}, sold}; wants match on set and name."""
+    """Load {wants, defaults, gem_rates, ref_labels, block, pop, sold}; wants match on set and name."""
     added = updated = 0
     existing = {(w.get("set"), w["who"]): w["_id"] for w in db.wants()}
     for w in body.get("wants", []):
@@ -334,6 +341,8 @@ def load_export(db: DB, body: dict) -> dict:
             updated += 1
         else:
             added += 1
+    if isinstance(body.get("ref_labels"), dict):  # {image stem: printed rarity, e.g. "SR★★"}
+        db.put("ref_labels", {**db.get("ref_labels", {}), **body["ref_labels"]})
     for setting in ("defaults", "gem_rates"):
         if setting in body:
             db.put(setting, body[setting])

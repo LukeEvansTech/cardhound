@@ -12,6 +12,8 @@ import re
 import urllib.request
 from pathlib import Path
 
+from .match import PRINT_ID, card_numbers
+
 MATCH, DIFFERS = 40, 15  # inlier thresholds: >= MATCH same art, < DIFFERS different art
 SMALL_REF = 400  # px on the long side
 UA_TAGS = ("FMA", "EVA", "CSM", "AOT")
@@ -24,12 +26,28 @@ def refs_for(w: dict, refs_dir: Path) -> list[Path]:
     tag = w.get("set") if w.get("set") in UA_TAGS else None
     if not tag:
         return []
-    nums = set(re.findall(r"\b(\d{3})\b", w.get("cards", "")))
-    out = []
-    for f in sorted(refs_dir.glob(f"*_{tag}-*.jpg")):
+    cards = w.get("cards", "")
+    prints = [f"{a}_{b}" for a, b in PRINT_ID.findall(cards)]
+    exact = [refs_dir / f"{p}{ext}" for p in prints for ext in (".jpg", ".png")]
+    out = [f for f in exact if f.exists()]  # exact prints listed: those images only
+    nums = card_numbers(PRINT_ID.sub(" ", cards))  # plus any card listed by number alone
+    for f in sorted(refs_dir.glob(f"*_{tag}-*")):
         m = re.search(r"-\d-(\d{3})", f.name)
-        if m and m.group(1) in nums and ("_p" in f.name or f.name.startswith("UEPR")):
+        if (
+            f.suffix in (".jpg", ".png")
+            and m
+            and m.group(1) in nums
+            and ("_p" in f.name or f.name.startswith("UEPR"))
+        ):
             out.append(f)
+    return list(dict.fromkeys(out))
+
+
+def listed_rarity(w: dict) -> dict:
+    """{image stem: rarity} as the card list of the want writes it ("UE22BT/CSM-1-056_p1 SR★★")."""
+    out = {}
+    for m in re.finditer(PRINT_ID.pattern + r"\s+([A-Z]{1,3}★*)(?=[\s,]|$)", w.get("cards", "")):
+        out[f"{m.group(1)}_{m.group(2)}"] = m.group(3)
     return out
 
 
@@ -104,7 +122,18 @@ def check(w: dict, key: str, src: str, refs_dir: Path, photos_dir: Path) -> dict
         kept = max((sc for sc, r in scored if r.name not in skip), default=0)
         if kept < MATCH:
             verdict = "unwanted"
-    return {"verdict": verdict, "score": best, "ref": ref.name, "photo": photo.name}
+    return {
+        "verdict": verdict,
+        "score": best,
+        "ref": ref.name,
+        "photo": photo.name,
+        "refs": ref_key(w, refs),
+    }
+
+
+def ref_key(w: dict, refs: list[Path]) -> list[str]:
+    """What a verdict was judged against: the art and the unticked art; a change means judge again."""
+    return sorted(r.name for r in refs) + [f"skip:{x}" for x in sorted(w.get("skip") or [])]
 
 
 def small(ref: Path) -> bool:
@@ -115,14 +144,18 @@ def small(ref: Path) -> bool:
     return m is not None and max(m.shape[:2]) < SMALL_REF
 
 
-def label(name: str) -> str:
-    """Short caption for a reference image: card number and star tier, or promo."""
-    m = re.search(r"^(UEPR)?.*?-\d-(\d{3})(?:_p(\d))?", name)
+def label(name: str, rarity: dict | None = None) -> str:
+    """Short caption for a reference image: card number and printed rarity, or promo.
+
+    The _p suffix only counts parallel prints (CSM-1-048_p1 is SR★★, _p2 is SR★), so the star
+    tier comes from the card list's rarity when it is known, never from the suffix.
+    """
+    m = re.search(r"^(UEPR)?.*?-\d-(\d{3}|AP\d{2})", name)
     if m:
-        promo, num, p = m.groups()
-        if promo:
-            return f"promo {num}"
-        return f"{num} {'★' * int(p)}" if p else num
+        promo, num = m.groups()
+        known = (rarity or {}).get(Path(name).stem)
+        text = f"promo {num}" if promo else num
+        return f"{text} {known}" if known else text
     m = re.search(r"^MTG_([a-z0-9]+)-(\d+)", name)
     if m:
         return f"{m.group(1).upper()} #{m.group(2)}"

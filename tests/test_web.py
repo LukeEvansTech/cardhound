@@ -286,8 +286,12 @@ def test_unticked_art_makes_a_photo_unwanted(tmp_path, monkeypatch):
     assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "unwanted"
     monkeypatch.setattr(photos, "score", lambda p, r: 60)  # a kept art matches as well
     assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "match"
-    assert photos.label("UE09BT_FMA-1-012_p2.jpg") == "012 ★★"
+    rarity = {"UE22BT_CSM-1-048_p1": "SR★★", "UE22BT_CSM-1-048_p2": "SR★"}
+    assert photos.label("UE22BT_CSM-1-048_p2.png", rarity) == "048 SR★"
+    assert photos.label("UE22BT_CSM-1-048_p1.jpg", rarity) == "048 SR★★"
+    assert photos.label("UE09BT_FMA-1-012_p2.jpg") == "012"  # no rarity known: no guessed stars
     assert photos.label("UEPR_FMA-1-010_p1.jpg") == "promo 010"
+    assert photos.label("UE22BT_CSM-1-AP03.png") == "AP03"
 
 
 def test_wants_cards_view_art_picker_and_defaults(env):
@@ -461,3 +465,57 @@ def test_runs_page_tolerates_odd_gem_rates(env):
     page = client.get("/ops")
     assert page.status_code == 200 and "FMA 77%" in page.text and "EVA not set" in page.text
     assert "PSA 10 $80.00" in page.text
+
+
+def test_imported_rarity_labels_the_art_picker(env):
+    _, _, client = env
+    client.put("/api/refs/UE22BT_CSM-1-048_p2.png", content=b"x" * 2000)
+    client.post(
+        "/api/import",
+        json={
+            "wants": [{"set": "CSM", "who": "Chainsaw Man", "refs": ["UE22BT_CSM-1-048_p2.png"]}],
+            "ref_labels": {"UE22BT_CSM-1-048_p2": "SR★"},
+        },
+    )
+    assert "048 SR★<" in client.get("/wants/1").text
+
+
+def test_listed_prints_pick_exactly_those_refs(tmp_path):
+    for n in ("UE22BT_CSM-1-053_p1.png", "UE22BT_CSM-1-056_p1.jpg", "UE22BT_CSM-1-055_p1.png"):
+        (tmp_path / n).write_bytes(b"x")
+    w = {"set": "CSM", "who": "Aki Hayakawa", "cards": "UE22BT/CSM-1-056_p1 SR★★"}
+    assert [p.name for p in photos.refs_for(w, tmp_path)] == ["UE22BT_CSM-1-056_p1.jpg"]
+    assert photos.listed_rarity(w) == {"UE22BT_CSM-1-056_p1": "SR★★"}
+
+
+def test_bare_numbers_alongside_prints_keep_their_art(tmp_path):
+    for n in ("UE15BT_EVA-1-082_p1.jpg", "UE15BT_EVA-1-081_p1.jpg"):
+        (tmp_path / n).write_bytes(b"x")
+    w = {"set": "EVA", "who": "Production Model-02", "cards": "UE15BT/EVA-1-082_p1 SR★, 081"}
+    assert sorted(p.name for p in photos.refs_for(w, tmp_path)) == [
+        "UE15BT_EVA-1-081_p1.jpg",
+        "UE15BT_EVA-1-082_p1.jpg",
+    ]
+
+
+def test_changed_art_gets_a_cached_verdict_judged_again(env, monkeypatch):
+    s, db, client = env
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    client.post(
+        "/api/import",
+        json={"wants": [{"set": "DBS", "who": "Vegito", "q": "v", "max": {"any": 900}}]},
+    )
+    calls = []
+
+    def fake_check(w, key, *_rest):
+        calls.append(key)
+        refs = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+        return {"verdict": "differs", "score": 3, "ref": "a", "photo": "p", "refs": refs}
+
+    monkeypatch.setattr(sweep.photos, "check", fake_check)
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    first = len(calls)
+    db.run("UPDATE wants SET spec = json_set(spec, '$.skip', json(?))", '["x.jpg"]')
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    assert len(calls) > first  # unticked art changed what the verdict means
