@@ -120,3 +120,12 @@ def test_card_numbers_accept_ids_without_a_set_prefix():
     assert match.card_numbers("UE15BT/EVA-1-082_p1 SR★, 081") == {"081", "082"}
     w = {"set": "EVA", "who": "Production Model-02", "cards": "EVA-1-081"}
     assert match.keep(w, "raw", "Union Arena Production Model-02 UE15BT/EVA-1-081 SR* NM", "")
+
+
+def test_card_numbers_read_parallels_and_action_points():
+    assert match.card_numbers("EVA-1-081_p1") == {"081"}
+    assert match.card_numbers("AP03, AP04") == {"AP03", "AP04"}
+    w = {"set": "CSM", "who": "CSM Action Point cards", "q": "x", "cards": "AP03"}
+    assert match.keep(w, "psa", "PSA 10 Union Arena Chainsaw Man CSM-1-AP03 Action Point", "")
+    odd = {"set": "EVA", "who": "Rei", "cards": "the blue one"}  # nothing readable: no check
+    assert match.keep(odd, "raw", "Union Arena Rei Ayanami UE15BT/EVA-1-010 R* NM", "")

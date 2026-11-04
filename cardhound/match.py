@@ -69,8 +69,11 @@ def card_numbers(cards: str) -> set[str]:
     """Card numbers a want lists, from print ids and bare numbers ("081, 082", "UEPR 010/012")."""
     out = {i.split("-")[-1].split("_")[0].upper() for _, i in PRINT_ID.findall(cards or "")}
     rest = PRINT_ID.sub(" ", cards or "")
-    out |= {n.upper() for n in TITLE_NO.findall(rest)}  # EVA-1-081 without its set prefix
-    out |= set(re.findall(r"(?<![\d-])(\d{3})(?!\d)", TITLE_NO.sub(" ", rest)))
+    card_id = re.compile(r"\b[A-Z]{2,4}-\d-(\d{3}|AP\d{2})(?:_p\d)?(?![0-9])", re.I)
+    out |= {n.upper() for n in card_id.findall(rest)}  # EVA-1-081(_p1) without its set prefix
+    rest = card_id.sub(" ", rest)
+    out |= {n.upper() for n in re.findall(r"(?<![\w-])(AP\d{2})(?!\d)", rest, re.I)}
+    out |= set(re.findall(r"(?<![\d-])(\d{3})(?!\d)", rest))
     return out
 
 
@@ -129,7 +132,8 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
     if w.get("set") in UA_SETS and w.get("cards"):
         # A title naming a card number the want doesn't list is another card (083, not 081/082).
         seen = {n.upper() for n in TITLE_NO.findall(title)}
-        if seen and not seen & card_numbers(w["cards"]):
+        listed = card_numbers(w["cards"])
+        if seen and listed and not seen & listed:  # no readable numbers: no check
             return False
     if FOREIGN.search(t) or FOREIGN_SELLER.search(text):
         return False
