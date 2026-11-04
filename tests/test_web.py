@@ -378,3 +378,86 @@ def test_kept_art_match_in_gallery_beats_an_unwanted_thumbnail(env, monkeypatch)
     row = db.one("SELECT deal, art FROM listings WHERE item_id = '111'")
     assert '"match"' in row["art"] and row["deal"] == 1
     assert calls == ["111", "111_0"]
+
+
+def test_switching_raw_off_retires_its_listings(env, monkeypatch):
+    s, db, client = env
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    client.post(
+        "/api/import",
+        json={
+            "wants": [
+                {
+                    "set": "DBS",
+                    "who": "Vegito",
+                    "q": "v",
+                    "rawq": "v raw",
+                    "raw_max": 900,
+                    "nostar": True,
+                }
+            ]
+        },
+    )
+    raw = {
+        **ROW,
+        "title": "Vegito BT7-118 SPR Dragon Ball Super NM",
+        "text": "Vegito BT7-118 $700.00",
+    }
+    sweep.run(db, s, browser=lambda: FakeBrowser([raw]))
+    assert db.one("SELECT count(*) AS n FROM listings WHERE kind = 'raw' AND active = 1")["n"] == 1
+    db.run("UPDATE wants SET spec = json_set(spec, '$.raw', json('false'))")
+    sweep.run(db, s, browser=lambda: FakeBrowser([raw]))
+    assert db.one("SELECT count(*) AS n FROM listings WHERE kind = 'raw' AND active = 1")["n"] == 0
+
+
+def test_tiny_reference_cannot_prove_a_mismatch(tmp_path, monkeypatch):
+    refs, shots = tmp_path / "refs", tmp_path / "photos"
+    refs.mkdir()
+    shots.mkdir()
+    (refs / "a.png").write_bytes(b"x")
+    monkeypatch.setattr(photos, "download", lambda src, dest: dest)
+    monkeypatch.setattr(photos, "score", lambda p, r: 3)
+    w = {"set": "DBS", "refs": ["a.png"]}
+    monkeypatch.setattr(photos, "small", lambda r: True)
+    assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "unclear"
+    monkeypatch.setattr(photos, "small", lambda r: False)
+    assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "differs"
+
+
+def test_deal_page_shows_price_against_market(env, monkeypatch):
+    s, db, client = env
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    client.post(
+        "/api/import",
+        json={"wants": [{"set": "DBS", "who": "Vegito", "q": "v", "max": {"any": 1150}}]},
+    )
+    client.post("/api/sold", json={"sold": _sold(3, 1000)})
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
+    page = client.get("/deal/111/psa").text
+    assert "71% of market" in page and "sold median $1,000" in page
+    assert "aria-current=page" in page
+    assert "71% of market" in client.get("/").text
+
+
+def test_one_tiny_wanted_reference_keeps_a_low_score_unclear(tmp_path, monkeypatch):
+    refs, shots = tmp_path / "refs", tmp_path / "photos"
+    refs.mkdir()
+    shots.mkdir()
+    for n in ("tiny.png", "big.png"):
+        (refs / n).write_bytes(b"x")
+    monkeypatch.setattr(photos, "download", lambda src, dest: dest)
+    monkeypatch.setattr(photos, "score", lambda p, r: 3)
+    monkeypatch.setattr(photos, "small", lambda r: r.name == "tiny.png")
+    w = {"set": "DBS", "refs": ["tiny.png", "big.png"]}
+    assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "unclear"
+    w["skip"] = ["tiny.png"]  # unticked, so only the large art counts
+    assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "differs"
+
+
+def test_runs_page_tolerates_odd_gem_rates(env):
+    _, db, client = env
+    db.put("gem_rates", {"FMA": "0.77", "EVA": None})
+    db.put("defaults", {"psa_1star_max": "80", "raw_1star_max": None})
+    page = client.get("/ops")
+    assert page.status_code == 200 and "FMA 77%" in page.text and "EVA not set" in page.text
+    assert "PSA 10 $80.00" in page.text

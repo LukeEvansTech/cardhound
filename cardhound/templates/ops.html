@@ -6,7 +6,8 @@
   <form method="post" action="/ops/run"><button class="primary" {{ 'disabled' if running }}>{{ 'Sweep running…' if running else 'Sweep now' }}</button></form>
 </section>
 <p class="muted">Schedule <code>{{ schedule }}</code>, next {{ next_at.strftime('%a %d %b %H:%M %Z') }}. Alert channels: {{ channels }}{% if not public_url %} (no public URL set, so alert links are relative){% endif %}.
-Ceiling defaults {{ defaults }}. Set gem rates {{ gem_rates }}.</p>
+1★ defaults: PSA 10 {{ defaults.psa_1star_max | money }}, raw {{ defaults.raw_1star_max | money }} (<a href="/wants">change</a>).
+Set gem rates: {% for k, v in gem_rates.items() %}{{ k }} {{ v | pct }}{{ ', ' if not loop.last }}{% endfor %}.</p>
 <form method="post" action="/ops/test-alert" class="inline"><button>Send a test alert</button></form>
 {% if log %}
 <h2>Live log</h2>

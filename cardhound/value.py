@@ -90,6 +90,14 @@ class Verdict:
     grade_cost: float | None = None
     max_bid: float | None = None
     buy_to_grade: bool = False
+    median: float | None = None  # same kind and star bucket, 90 days
+    low: float | None = None
+    high: float | None = None
+
+    @property
+    def market(self) -> float | None:
+        """Landed price as a share of the sold median (1.0 = market price)."""
+        return self.total / self.median if self.median else None
 
     @property
     def is_deal(self) -> bool:
@@ -222,4 +230,16 @@ def assess(
 
     star_txt = f"{star}★ " if star != "-" else ""
     headline = f"{w['who']} {star_txt}{'PSA 10' if kind == 'psa' else 'raw'} ${total:,.0f}"
-    return Verdict(rating, headline, advice, reasons, total, grade_cost, max_bid, buy_to_grade)
+    return Verdict(
+        rating,
+        headline,
+        advice,
+        reasons,
+        total,
+        grade_cost,
+        max_bid,
+        buy_to_grade,
+        median=same.median if same else None,
+        low=same.low if same else None,
+        high=same.high if same else None,
+    )

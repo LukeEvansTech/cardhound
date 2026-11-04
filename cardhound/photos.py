@@ -13,6 +13,7 @@ import urllib.request
 from pathlib import Path
 
 MATCH, DIFFERS = 40, 15  # inlier thresholds: >= MATCH same art, < DIFFERS different art
+SMALL_REF = 400  # px on the long side
 UA_TAGS = ("FMA", "EVA", "CSM", "AOT")
 
 
@@ -96,12 +97,22 @@ def check(w: dict, key: str, src: str, refs_dir: Path, photos_dir: Path) -> dict
         return none
     verdict = "match" if best >= MATCH else "differs" if best < DIFFERS else "unclear"
     skip = set(w.get("skip") or [])
+    if verdict == "differs" and any(small(r) for r in refs if r.name not in skip):
+        verdict = "unclear"  # missing a thumbnail-sized wanted art proves nothing
     if verdict == "match" and ref.name in skip:
         # 1★ and 2★ of one card share their art, so only call it unwanted when no kept art matches too.
         kept = max((sc for sc, r in scored if r.name not in skip), default=0)
         if kept < MATCH:
             verdict = "unwanted"
     return {"verdict": verdict, "score": best, "ref": ref.name, "photo": photo.name}
+
+
+def small(ref: Path) -> bool:
+    """True for a reference too small to rule a photo out (the DBS card list's 260px scans)."""
+    import cv2
+
+    m = cv2.imread(str(ref), cv2.IMREAD_UNCHANGED)
+    return m is not None and max(m.shape[:2]) < SMALL_REF
 
 
 def label(name: str) -> str:

@@ -25,7 +25,13 @@ RATING_ORDER = {"great": 0, "good": 1, "unknown": 2, "fair": 3, "high": 4}
 
 
 def money(v) -> str:
-    return "" if v is None else f"${v:,.2f}" if v < 100 else f"${v:,.0f}"
+    try:  # imported settings may hold numeric strings
+        f = float(v)
+    except (TypeError, ValueError):
+        return ""
+    if not math.isfinite(f):
+        return ""
+    return f"${f:,.2f}" if f < 100 else f"${f:,.0f}"
 
 
 def star_label(star: str) -> str:
@@ -74,6 +80,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     tpl.env.filters["money"] = money
     tpl.env.filters["star"] = star_label
     tpl.env.filters["ebay_img"] = ebay_img
+    tpl.env.filters["pct"] = pct
     tpl.env.globals["version"] = s.version
     progress: list[str] = []
 
@@ -359,6 +366,9 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         new_id = db.save_want(spec, want_id, enabled=form.get("enabled") == "on")
         # Its refs may have changed: photo verdicts are judged again on the next sweep.
         db.run("UPDATE listings SET art = NULL WHERE want_id = ?", new_id)
+        saved = db.want(new_id)
+        if saved:
+            sweep.retire_unsearched(db, saved)
         return RedirectResponse(f"/wants/{new_id}", status_code=303)
 
     @app.post("/wants/{want_id}/delete")
@@ -463,6 +473,15 @@ def _file(base: Path, name: str) -> FileResponse:
     if not SAFE_NAME.match(name) or not (base / name).is_file():
         raise HTTPException(404, "no such image")
     return FileResponse(base / name, headers={"Cache-Control": "max-age=86400"})
+
+
+def pct(v) -> str:
+    """A rate as a percentage, tolerating the strings and nulls /api/import accepts."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return "not set"
+    return f"{f:.0%}" if math.isfinite(f) else "not set"
 
 
 def form_echo(form: dict, want_id: int | None) -> dict:
