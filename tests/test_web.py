@@ -338,7 +338,7 @@ def test_kept_art_match_in_gallery_beats_an_unwanted_thumbnail(env, monkeypatch)
     )
     calls = []
 
-    def fake_check(w, key, src, refs_dir, photos_dir):
+    def fake_check(_w, key, *_rest):
         calls.append(key)
         if key == "111":
             return {"verdict": "unwanted", "score": 100, "ref": "b.jpg", "photo": "p"}
