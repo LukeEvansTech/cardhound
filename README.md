@@ -41,8 +41,9 @@ CARDHOUND_DATA=data CARDHOUND_SCHEDULE='0 0 1 1 *' .venv/bin/python -m cardhound
 .venv/bin/python -m cardhound sweep --only Vegito --no-notify
 ```
 
-Docker: `docker build -t cardhound .` then `docker run -v cardhound:/data -p 8080:8080 cardhound`.
-The image runs as uid 65532 with a read-only root filesystem; give it a writable `/tmp`.
+Docker: `docker build -t cardhound .` then
+`docker run --read-only --tmpfs /tmp -v cardhound:/data -p 8080:8080 cardhound`. The image runs as
+uid 65532 and works with a read-only root filesystem as long as `/tmp` is writable.
 
 ## Configuration
 

@@ -90,7 +90,8 @@ def collect(b: Browser, w: dict, blocked: set[str], defaults: dict, today: str, 
 def store(db: DB, run_id: int, found: list[dict], sold: list[dict], searched: list[tuple]) -> None:
     now = dt.datetime.now().isoformat(timespec="seconds")
     live = {w["_id"] for w in db.wants()}  # a want deleted mid-sweep must not come back
-    found = [f for f in found if f["want_id"] in live]
+    blocked = db.blocked()  # nor a listing blocked mid-sweep
+    found = [f for f in found if f["want_id"] in live and f["item_id"] not in blocked]
     sold = [x for x in sold if x["want_id"] in live]
     searched = [x for x in searched if x[0] in live]
     with db.tx() as c:
@@ -188,7 +189,7 @@ def alert(db: DB, s: Settings, run_id: int, wants: dict[int, dict]) -> tuple[int
             """SELECT l.*, a.usd AS alerted_usd FROM listings l
                LEFT JOIN alerts a ON a.item_id = l.item_id AND a.kind = l.kind
                WHERE l.active = 1 AND l.deal = 1 AND l.last_run = ?
-                 AND (a.item_id IS NULL OR l.usd < a.usd * 0.9)""",
+                 AND (a.item_id IS NULL OR l.usd + coalesce(l.ship, 0) < a.usd * 0.9)""",
             run_id,
         )
     ]
@@ -255,7 +256,8 @@ def baseline(db: DB, s: Settings, run_id: int, deals: int) -> tuple[int, str]:
     )
     if res == "sent":
         for r in db.all(
-            "SELECT item_id, kind, usd, art FROM listings WHERE last_run = ? AND deal = 1", run_id
+            "SELECT item_id, kind, usd, ship, art FROM listings WHERE last_run = ? AND deal = 1",
+            run_id,
         ):
             # A provisional photo mismatch stays out of the ledger so a later match can alert.
             if (json.loads(r["art"]) if r["art"] else {}).get("verdict") != "differs":
@@ -271,7 +273,7 @@ def _mark(db: DB, r: dict, run_id: int) -> None:
         "sent = datetime('now')",
         r["item_id"],
         r["kind"],
-        r["usd"],
+        r["usd"] + (r.get("ship") or 0),  # landed price, as deals are judged
         run_id,
     )
     db.run(

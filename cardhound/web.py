@@ -445,6 +445,11 @@ def spec_from_form(form: dict) -> dict:
                 re.compile(spec[key])
             except re.error as e:
                 raise ValueError(f"'{key}' is not a valid regular expression: {e}") from e
+    if isinstance(spec.get("pop"), dict) and spec["pop"].get("row"):
+        try:
+            re.compile(spec["pop"]["row"])
+        except re.error as e:
+            raise ValueError(f"pop.row is not a valid regular expression: {e}") from e
     for key, prefix in (("max", "max_"), ("rawmax", "rawmax_")):
         vals = {}
         for b in ("1", "2", "3", "any"):

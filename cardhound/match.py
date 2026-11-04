@@ -114,9 +114,9 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
         return False
     if w.get("set") == "DBS" and re.search(r"signed|autograph|\bauto\b|sabat|schemmel|nadolny", t):
         return False  # voice-actor autographs, not the printed Masters signature SPR
-    if w.get("needstar") and stars(title) == "-":
-        return False
     if kind == "psa":
+        if w.get("needstar") and stars(title) == "-":
+            return False
         return bool(re.search(r"psa ?10|psa gem", t))
     return not GRADED.search(t) and (bool(w.get("nostar")) or stars(title) != "-")
 
