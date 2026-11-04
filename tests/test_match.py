@@ -96,3 +96,20 @@ def test_hyphenated_and_triple_asterisk_stars():
 def test_digit_star_symbol():
     assert match.stars("Edward 2★ UE09BT") == "2"
     assert match.stars("Edward 3☆ serial") == "3"
+
+
+def test_title_naming_an_unlisted_card_number_is_another_card():
+    w = {"set": "EVA", "who": "Production Model-02", "cards": "081, 082"}
+    assert not match.keep(w, "raw", "Union Arena Production Model-02 UE15BT/EVA-1-083 SR* NM", "")
+    assert match.keep(w, "raw", "Union Arena Production Model-02 UE15BT/EVA-1-081 SR* NM", "")
+    aki = {"set": "CSM", "who": "Aki Hayakawa", "cards": "UE22BT/CSM-1-056_p1 SR★★"}
+    assert not match.keep(
+        aki, "raw", "Union Arena Aki Hayakawa Chainsaw Man UE22BT/CSM-1-053 U*", ""
+    )
+    assert match.card_numbers("011, 012 (1★, 2★), 040, UEPR 010/012/039") == {
+        "010",
+        "011",
+        "012",
+        "039",
+        "040",
+    }

@@ -86,7 +86,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
 
     def art_choices(w: dict) -> list[dict]:
         skip = set_of(w.get("skip"))
-        rarity = db.get("ref_labels", {})
+        rarity = {**db.get("ref_labels", {}), **photos.listed_rarity(w)}
         return [
             {"name": r.name, "label": photos.label(r.name, rarity), "kept": r.name not in skip}
             for r in photos.refs_for(w, s.refs_dir)

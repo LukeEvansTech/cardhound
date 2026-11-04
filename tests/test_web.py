@@ -478,3 +478,11 @@ def test_imported_rarity_labels_the_art_picker(env):
         },
     )
     assert "048 SR★<" in client.get("/wants/1").text
+
+
+def test_listed_prints_pick_exactly_those_refs(tmp_path):
+    for n in ("UE22BT_CSM-1-053_p1.png", "UE22BT_CSM-1-056_p1.jpg", "UE22BT_CSM-1-055_p1.png"):
+        (tmp_path / n).write_bytes(b"x")
+    w = {"set": "CSM", "who": "Aki Hayakawa", "cards": "UE22BT/CSM-1-056_p1 SR★★"}
+    assert [p.name for p in photos.refs_for(w, tmp_path)] == ["UE22BT_CSM-1-056_p1.jpg"]
+    assert photos.listed_rarity(w) == {"UE22BT_CSM-1-056_p1": "SR★★"}

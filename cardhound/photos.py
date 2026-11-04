@@ -12,6 +12,8 @@ import re
 import urllib.request
 from pathlib import Path
 
+from .match import PRINT_ID, card_numbers
+
 MATCH, DIFFERS = 40, 15  # inlier thresholds: >= MATCH same art, < DIFFERS different art
 SMALL_REF = 400  # px on the long side
 UA_TAGS = ("FMA", "EVA", "CSM", "AOT")
@@ -24,12 +26,30 @@ def refs_for(w: dict, refs_dir: Path) -> list[Path]:
     tag = w.get("set") if w.get("set") in UA_TAGS else None
     if not tag:
         return []
-    nums = set(re.findall(r"\b(\d{3})\b", w.get("cards", "")))
+    cards = w.get("cards", "")
+    prints = [f"{a}_{b}" for a, b in PRINT_ID.findall(cards)]
+    if prints:  # exact prints listed: those and nothing else
+        found = [refs_dir / f"{p}{ext}" for p in prints for ext in (".jpg", ".png")]
+        return [f for f in found if f.exists()]
+    nums = card_numbers(cards)
     out = []
-    for f in sorted(refs_dir.glob(f"*_{tag}-*.jpg")):
+    for f in sorted(refs_dir.glob(f"*_{tag}-*")):
         m = re.search(r"-\d-(\d{3})", f.name)
-        if m and m.group(1) in nums and ("_p" in f.name or f.name.startswith("UEPR")):
+        if (
+            f.suffix in (".jpg", ".png")
+            and m
+            and m.group(1) in nums
+            and ("_p" in f.name or f.name.startswith("UEPR"))
+        ):
             out.append(f)
+    return out
+
+
+def listed_rarity(w: dict) -> dict:
+    """{image stem: rarity} as the want's card list writes it ("UE22BT/CSM-1-056_p1 SR★★")."""
+    out = {}
+    for m in re.finditer(PRINT_ID.pattern + r"\s+([A-Z]{1,3}★*)(?=[\s,]|$)", w.get("cards", "")):
+        out[f"{m.group(1)}_{m.group(2)}"] = m.group(3)
     return out
 
 
