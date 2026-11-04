@@ -323,7 +323,7 @@ def _mark(db: DB, r: dict, run_id: int) -> None:
 
 
 def load_export(db: DB, body: dict) -> dict:
-    """Load {wants, defaults, gem_rates, block, pop: {fetched, rows}, sold}; wants match on set and name."""
+    """Load {wants, defaults, gem_rates, ref_labels, block, pop, sold}; wants match on set and name."""
     added = updated = 0
     existing = {(w.get("set"), w["who"]): w["_id"] for w in db.wants()}
     for w in body.get("wants", []):
@@ -334,6 +334,8 @@ def load_export(db: DB, body: dict) -> dict:
             updated += 1
         else:
             added += 1
+    if isinstance(body.get("ref_labels"), dict):  # {image stem: printed rarity, e.g. "SR★★"}
+        db.put("ref_labels", {**db.get("ref_labels", {}), **body["ref_labels"]})
     for setting in ("defaults", "gem_rates"):
         if setting in body:
             db.put(setting, body[setting])

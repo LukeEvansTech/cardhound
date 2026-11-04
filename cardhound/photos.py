@@ -115,14 +115,18 @@ def small(ref: Path) -> bool:
     return m is not None and max(m.shape[:2]) < SMALL_REF
 
 
-def label(name: str) -> str:
-    """Short caption for a reference image: card number and star tier, or promo."""
-    m = re.search(r"^(UEPR)?.*?-\d-(\d{3})(?:_p(\d))?", name)
+def label(name: str, rarity: dict | None = None) -> str:
+    """Short caption for a reference image: card number and printed rarity, or promo.
+
+    The _p suffix only counts parallel prints (CSM-1-048_p1 is SR★★, _p2 is SR★), so the star
+    tier comes from the card list's rarity when it is known, never from the suffix.
+    """
+    m = re.search(r"^(UEPR)?.*?-\d-(\d{3}|AP\d{2})", name)
     if m:
-        promo, num, p = m.groups()
-        if promo:
-            return f"promo {num}"
-        return f"{num} {'★' * int(p)}" if p else num
+        promo, num = m.groups()
+        known = (rarity or {}).get(Path(name).stem)
+        text = f"promo {num}" if promo else num
+        return f"{text} {known}" if known else text
     m = re.search(r"^MTG_([a-z0-9]+)-(\d+)", name)
     if m:
         return f"{m.group(1).upper()} #{m.group(2)}"

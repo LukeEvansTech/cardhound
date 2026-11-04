@@ -286,8 +286,12 @@ def test_unticked_art_makes_a_photo_unwanted(tmp_path, monkeypatch):
     assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "unwanted"
     monkeypatch.setattr(photos, "score", lambda p, r: 60)  # a kept art matches as well
     assert photos.check(w, "1", "http://x", refs, shots)["verdict"] == "match"
-    assert photos.label("UE09BT_FMA-1-012_p2.jpg") == "012 ★★"
+    rarity = {"UE22BT_CSM-1-048_p1": "SR★★", "UE22BT_CSM-1-048_p2": "SR★"}
+    assert photos.label("UE22BT_CSM-1-048_p2.png", rarity) == "048 SR★"
+    assert photos.label("UE22BT_CSM-1-048_p1.jpg", rarity) == "048 SR★★"
+    assert photos.label("UE09BT_FMA-1-012_p2.jpg") == "012"  # no rarity known: no guessed stars
     assert photos.label("UEPR_FMA-1-010_p1.jpg") == "promo 010"
+    assert photos.label("UE22BT_CSM-1-AP03.png") == "AP03"
 
 
 def test_wants_cards_view_art_picker_and_defaults(env):
@@ -461,3 +465,16 @@ def test_runs_page_tolerates_odd_gem_rates(env):
     page = client.get("/ops")
     assert page.status_code == 200 and "FMA 77%" in page.text and "EVA not set" in page.text
     assert "PSA 10 $80.00" in page.text
+
+
+def test_imported_rarity_labels_the_art_picker(env):
+    _, _, client = env
+    client.put("/api/refs/UE22BT_CSM-1-048_p2.png", content=b"x" * 2000)
+    client.post(
+        "/api/import",
+        json={
+            "wants": [{"set": "CSM", "who": "Chainsaw Man", "refs": ["UE22BT_CSM-1-048_p2.png"]}],
+            "ref_labels": {"UE22BT_CSM-1-048_p2": "SR★"},
+        },
+    )
+    assert "048 SR★<" in client.get("/wants/1").text
