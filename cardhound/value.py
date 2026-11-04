@@ -7,6 +7,7 @@ verdict the deal page and the alert show.
 from __future__ import annotations
 
 import datetime as dt
+import math
 import re
 import statistics
 from dataclasses import dataclass, field
@@ -211,7 +212,7 @@ def assess(
         elif kind == "raw" and raw:
             anchors.append(raw.median * 0.92)
         if anchors:
-            max_bid = max(0.0, min(anchors) - (ship or 0))
+            max_bid = float(max(0, math.floor(min(anchors) - (ship or 0))))  # never round up
             advice += f" Auction: a snipe up to ${max_bid:,.0f} keeps it a deal."
 
     star_txt = f"{star}★ " if star != "-" else ""

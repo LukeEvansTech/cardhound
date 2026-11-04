@@ -76,3 +76,10 @@ def test_max_bid_stays_a_deal_at_the_new_cutoff():
     raw = value.comps(sold("raw", "2", 50), TODAY)
     v = value.assess(listing(kind="raw", usd=10, cap=60, auction=1), W, raw, [], {}, 39.99, 6)
     assert v.max_bid == 46
+
+
+def test_max_bid_never_rounds_past_the_cutoff():
+    cmp = value.comps(sold("psa", "2", 139.25), TODAY)
+    v = value.assess(listing(usd=50, cap=1000, auction=1), W, cmp, [], {}, 39.99, 6)
+    assert v.max_bid == 128
+    assert value.assess(listing(usd=v.max_bid, cap=1000), W, cmp, [], {}, 39.99, 6).is_deal

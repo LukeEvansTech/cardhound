@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 import re
 import threading
 import urllib.parse
@@ -306,8 +307,8 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
                 val = float(raw)
             except ValueError as e:
                 raise HTTPException(400, f"{key} must be a number") from e
-            if val < 0:
-                raise HTTPException(400, f"{key} must not be negative")
+            if not math.isfinite(val) or val < 0:
+                raise HTTPException(400, f"{key} must be a number of zero or more")
             cur[key] = val
         db.put("defaults", cur)
         return RedirectResponse("/wants", status_code=303)
@@ -340,6 +341,8 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         form["keep"] = [str(x) for x in data.getlist("keep")]
         form["art_all"] = [str(x) for x in data.getlist("art_all")]
         want_id = int(str(form["_id"])) if form.get("_id") else None
+        old = db.want(want_id) if want_id is not None else None
+        form["prev_skip"] = sorted(set_of((old or {}).get("skip")))
         try:
             spec = spec_from_form(form)
         except ValueError as e:
@@ -542,10 +545,13 @@ def spec_from_form(form: dict) -> dict:
     else:
         spec.pop("refs", None)
     every, keep = form.get("art_all") or [], set(form.get("keep") or [])
-    skip = [a for a in every if a not in keep]
+    # Exclusions for art not on the form (its file is missing just now) are kept as they were.
+    prev = set(form.get("prev_skip") or []) | set_of(spec.get("skip"))
+    skip = [a for a in sorted(prev) if a not in every]
+    skip += [a for a in every if a not in keep]
     if skip:
         spec["skip"] = skip
-    elif every:
+    else:
         spec.pop("skip", None)
     if spec.get("set") not in match.UA_SETS and not spec.get("q"):
         raise ValueError("Cards outside Union Arena need an eBay search (PSA 10 query)")

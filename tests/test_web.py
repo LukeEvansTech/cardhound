@@ -324,6 +324,25 @@ def test_wants_cards_view_art_picker_and_defaults(env):
     assert r.status_code == 303
     assert db.defaults()["raw_1star_max"] == 12
     assert client.post("/wants/defaults", data={"psa_1star_max": "x"}).status_code == 400
+    nan = {"psa_1star_max": "nan", "raw_1star_max": "12"}
+    assert client.post("/wants/defaults", data=nan).status_code == 400
+    # an unticked art whose file has gone missing keeps its exclusion through an unrelated save
+    db.run("UPDATE wants SET spec = json_set(spec, '$.skip', json('[\"gone.jpg\"]'))")
+    client.post(
+        "/wants",
+        data={
+            "_id": "1",
+            "who": "Vegito",
+            "set": "DBS",
+            "q": "v",
+            "refs": "a.jpg, b.jpg",
+            "keep": ["a.jpg", "b.jpg"],
+            "art_all": ["a.jpg", "b.jpg"],
+            "extra": "{}",
+            "enabled": "on",
+        },
+    )
+    assert db.want(1)["skip"] == ["gone.jpg"]
 
 
 def test_kept_art_match_in_gallery_beats_an_unwanted_thumbnail(env, monkeypatch):
