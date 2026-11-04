@@ -79,7 +79,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     def page(request: Request, name: str, **ctx) -> HTMLResponse:
         return tpl.TemplateResponse(request, name, ctx)
 
-    def start_sweep(trigger: str, only: str = "") -> bool:
+    def start_sweep(trigger: str, want_ids: list[int] | None = None) -> bool:
         if sweep.LOCK.locked():
             return False
         progress.clear()
@@ -90,7 +90,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
 
         threading.Thread(
             target=sweep.run,
-            kwargs={"db": db, "s": s, "trigger": trigger, "only": only, "progress": say},
+            kwargs={"db": db, "s": s, "trigger": trigger, "want_ids": want_ids, "progress": say},
             daemon=True,
         ).start()
         return True
@@ -303,6 +303,8 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             )
         # An unticked checkbox is simply absent from the form.
         new_id = db.save_want(spec, want_id, enabled=form.get("enabled") == "on")
+        # Its refs may have changed: photo verdicts are judged again on the next sweep.
+        db.run("UPDATE listings SET art = NULL WHERE want_id = ?", new_id)
         return RedirectResponse(f"/wants/{new_id}", status_code=303)
 
     @app.post("/wants/{want_id}/delete")
@@ -322,7 +324,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         w = db.want(want_id)
         if not w:
             raise HTTPException(404, "want not found")
-        start_sweep("manual", only=w["who"])
+        start_sweep("manual", want_ids=[want_id])
         return RedirectResponse("/ops", status_code=303)
 
     # --- ops ---
@@ -385,6 +387,9 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         if not 1000 < len(data) < 15_000_000:
             raise HTTPException(400, "image size out of range")
         (s.refs_dir / name).write_bytes(data)
+        db.run(
+            "UPDATE listings SET art = NULL WHERE art IS NOT NULL AND art NOT LIKE '%\"match\"%'"
+        )
         return {"stored": name, "bytes": len(data)}
 
     @app.get("/api/refs")

@@ -357,6 +357,7 @@ def run(
     trigger: str = "schedule",
     only: str = "",
     notify_on: bool = True,
+    want_ids: list[int] | None = None,
     browser: Callable[[], Browser] | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> int:
@@ -384,6 +385,8 @@ def run(
         if only:
             subs = [o.strip().lower() for o in only.split(",") if o.strip()]
             wants = [w for w in wants if any(o in w["who"].lower() for o in subs)]
+        if want_ids:
+            wants = [w for w in wants if w["_id"] in want_ids]
         by_id = {w["_id"]: w for w in wants}
         defaults, blocked = db.defaults(), db.blocked()
         today = dt.date.today().isoformat()
@@ -410,7 +413,7 @@ def run(
         first = not db.get("baseline_done", False)
         if not searched:
             sent, status = 0, "nothing searched"
-        elif notify_on and first and not only:
+        elif notify_on and first and not only and not want_ids:
             sent, status = baseline(db, s, run_id, deals)
         elif notify_on:
             sent, status = alert(db, s, run_id, by_id)
