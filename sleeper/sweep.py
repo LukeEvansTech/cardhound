@@ -113,7 +113,8 @@ def collect(
                     "auction": int(bool(bids)),
                     "bids": bids.group(0) if bids else "",
                     "time_left": left,
-                    "ends": (
+                    "ends": r.get("ends")
+                    or (
                         (r["seen"] + span).isoformat(timespec="minutes")
                         if span is not None
                         else None

@@ -125,13 +125,20 @@ def row(item: dict, now: dt.datetime | None = None) -> dict | None:
     img = (item.get("image") or {}).get("imageUrl") or next(
         (i.get("imageUrl", "") for i in item.get("thumbnailImages") or []), ""
     )
-    return {
+    out = {
         "id": str(item_id),
         "title": title,
         "price": f"${usd:,.2f}",
         "text": " ".join(bits),
         "img": img,
     }
+    if "AUCTION" in options:
+        try:  # the exact end, in the sweep's local clock like its other timestamps
+            end = dt.datetime.fromisoformat(item.get("itemEndDate", "").replace("Z", "+00:00"))
+            out["ends"] = end.astimezone().replace(tzinfo=None).isoformat(timespec="minutes")
+        except ValueError:
+            pass
+    return out
 
 
 class BrowseAPI:

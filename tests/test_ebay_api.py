@@ -85,6 +85,8 @@ def test_row_reads_like_a_search_card():
     assert r["id"] == "7" and r["price"] == "$12.00"
     assert match.shipping(r["text"]) == 4.5
     assert "3 bids" in r["text"] and "1d 4h left" in r["text"] and "or Best Offer" in r["text"]
+    want_end = dt.datetime.fromisoformat(end).astimezone().replace(tzinfo=None)
+    assert r["ends"] == want_end.isoformat(timespec="minutes")
     assert match.FOREIGN_SELLER.search(r["text"])  # a Japanese seller is dropped as on the site
 
 
