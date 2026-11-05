@@ -389,7 +389,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         # sold comps live under the card's family id; drop them once no remaining print uses them
         orphans = {
             cid
-            for cid in {want_id, match.comp_id(gone) if gone else want_id}
+            for cid in (want_id, match.comp_id(gone) if gone else want_id)
             if not any(match.comp_id(x) == cid for x in rest)
         }
         with db.tx() as c:
