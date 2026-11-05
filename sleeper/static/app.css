@@ -319,7 +319,26 @@ button,
   box-shadow: var(--shadow);
 }
 
+.toggle .tl {
+  align-self: center;
+  padding: 0 4px 0 10px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.toggle .n {
+  margin-left: 2px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 /* --- card grid and the slab tile --- */
+
+.grid > .empty {
+  grid-column: 1 / -1;
+}
 
 .grid {
   display: grid;
