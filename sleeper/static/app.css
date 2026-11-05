@@ -810,7 +810,7 @@ textarea {
   font-size: 0.85rem;
 }
 
-.want-tile .tile-actions a {
+.want-tile :where(.tile-actions) a {
   text-decoration: none;
   font-weight: 600;
   background: linear-gradient(currentcolor, currentcolor) right bottom / 0 1px
@@ -818,7 +818,7 @@ textarea {
   transition: background-size var(--m-out) var(--m-ease);
 }
 
-.want-tile .tile-actions a:where(:hover) {
+.want-tile :where(.tile-actions) a:where(:hover) {
   background-size: 100% 1px;
   background-position: left bottom;
   transition-duration: var(--m-in);
@@ -886,7 +886,7 @@ textarea {
   margin-right: 14px;
 }
 
-.defaults .mini input {
+.defaults :where(.mini) input {
   width: 6rem;
 }
 
@@ -990,7 +990,7 @@ textarea {
   background: var(--well);
 }
 
-.palette li img {
+.palette :where(li) img {
   width: 36px;
   height: 48px;
   object-fit: contain;
