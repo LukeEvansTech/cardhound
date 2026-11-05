@@ -63,7 +63,9 @@ def collect(
 
     def fetch(url: str) -> list[dict] | None:
         if url not in cache:
-            cache[url] = b.search(url)
+            got, seen = b.search(url), dt.datetime.now()
+            # countdowns count from the fetch, not from when a sibling print reuses the rows
+            cache[url] = None if got is None else [{**r, "seen": seen} for r in got]
         return cache[url]
 
     for kind, q in match.searches(w):
@@ -112,7 +114,9 @@ def collect(
                     "bids": bids.group(0) if bids else "",
                     "time_left": left,
                     "ends": (
-                        (dt.datetime.now() + span).isoformat(timespec="minutes") if span else None
+                        (r["seen"] + span).isoformat(timespec="minutes")
+                        if span is not None
+                        else None
                     ),
                     "obo": int("or Best Offer" in r["text"]),
                     "img": r.get("img", ""),
