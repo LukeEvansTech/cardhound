@@ -29,12 +29,16 @@
   --unknown: #58626e;
   --shadow: 0 1px 0 rgb(21 32 43 / 6%), 0 8px 24px -16px rgb(21 32 43 / 35%);
   --radius: 14px;
+  --m-in: 140ms;
+  --m-out: 200ms;
+  --m-press: 90ms;
+  --m-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --radius-sm: 8px;
   --foil: conic-gradient(
     from 210deg,
     #7be0d6,
-    #a9b8ff,
-    #f6a6e0,
+    #8fd3ff,
+    #f6a6c8,
     #ffe08a,
     #9be7a6,
     #7be0d6
@@ -119,6 +123,13 @@ a {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
+  animation: focus-settle var(--m-out) var(--m-ease);
+}
+
+@keyframes focus-settle {
+  from {
+    outline-offset: 6px;
+  }
 }
 
 input[type="checkbox"] {
@@ -196,21 +207,46 @@ h2 {
 }
 
 .top nav a {
+  position: relative;
   color: var(--muted);
   text-decoration: none;
-  padding: 6px 10px;
-  border-radius: 99px;
+  padding: 8px 10px;
   font-weight: 600;
+  transition: color var(--m-out) var(--m-ease);
+}
+
+/* Nav words rest bare; a 1px line draws under them on hover, a 2px bar marks the current page. */
+.top nav a::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 1px;
+  background: currentcolor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--m-out) var(--m-ease);
 }
 
 .top nav a:hover {
   color: var(--ink);
+  transition-duration: var(--m-in);
+}
+
+.top nav a:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+  transition-duration: var(--m-in);
 }
 
 .top nav a[aria-current="page"] {
   color: var(--ink);
-  background: var(--panel);
-  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.top nav a[aria-current="page"]::after {
+  height: 2px;
+  transform: scaleX(1);
 }
 
 .top .tools {
@@ -314,6 +350,34 @@ button,
   font-weight: 600;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  button,
+  .button {
+    transition:
+      transform var(--m-out) var(--m-ease),
+      background-color var(--m-out) var(--m-ease),
+      border-color var(--m-out) var(--m-ease);
+  }
+
+  button:hover,
+  .button:hover {
+    transform: translateY(-1px);
+    border-color: var(--muted);
+    background-color: color-mix(in srgb, var(--panel) 86%, var(--ink));
+    transition-duration: var(--m-in);
+  }
+
+  .primary:hover {
+    background-color: color-mix(in srgb, var(--accent) 86%, var(--ink));
+  }
+
+  button:active,
+  .button:active {
+    transform: translateY(1px) scale(0.985);
+    transition-duration: var(--m-press);
+  }
+}
+
 .primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -378,8 +442,34 @@ button,
   overflow: hidden;
 }
 
-.tile:hover {
+a.tile,
+.want-tile {
+  transition:
+    transform 180ms var(--m-ease),
+    border-color var(--m-out) var(--m-ease),
+    box-shadow 180ms var(--m-ease);
+}
+
+a.tile:hover,
+.want-tile:hover {
+  transform: translateY(-2px);
   border-color: var(--muted);
+  box-shadow:
+    var(--shadow),
+    0 12px 24px -12px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.tile .well {
+  overflow: hidden;
+}
+
+.tile .well img {
+  transition: transform 600ms var(--m-ease);
+}
+
+a.tile:hover .well img,
+.want-tile:hover .well img {
+  transform: scale(1.03);
 }
 
 /* The foil edge: only a steal (landed at 40% of market or less) gets it. */
@@ -792,6 +882,14 @@ textarea {
 .want-tile .tile-actions a {
   text-decoration: none;
   font-weight: 600;
+  background: linear-gradient(currentcolor, currentcolor) right bottom / 0 1px no-repeat;
+  transition: background-size var(--m-out) var(--m-ease);
+}
+
+.want-tile .tile-actions a:hover {
+  background-size: 100% 1px;
+  background-position: left bottom;
+  transition-duration: var(--m-in);
 }
 
 .want-tile .ceilings {
@@ -1033,6 +1131,24 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation: none !important;
+  }
+
+  a.tile:hover,
+  .want-tile:hover,
+  a.tile:hover .well img,
+  .want-tile:hover .well img,
+  button:hover,
+  .button:hover,
+  button:active,
+  .button:active {
+    transform: none;
+  }
+
   .palette::backdrop {
     backdrop-filter: none;
   }
