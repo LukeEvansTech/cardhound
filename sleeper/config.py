@@ -56,7 +56,13 @@ class Settings:
 
     @property
     def summary_on(self) -> bool:
-        return bool(self.smtp_host and self.mail_from and self.summary_to)
+        # email links must be absolute, so the public URL is required too
+        return bool(
+            self.smtp_host
+            and self.mail_from
+            and self.summary_to
+            and self.public_url.startswith(("https://", "http://"))
+        )
 
     @property
     def db_path(self) -> Path:

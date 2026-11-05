@@ -158,3 +158,32 @@ def test_a_failed_baseline_alert_counts_as_a_problem(env):
     baseline(db, s, [row("1", 700)])
     db.run("INSERT INTO runs (status, alerts) VALUES ('success', 'baseline failed: TimeoutError')")
     assert summary.gather(db, s)["bad_runs"] == 1
+
+
+def test_first_window_survives_a_failed_send(env):
+    s, db, client = env
+    sweep_with(db, s, [row("1", 700)])
+    sweep_with(db, s, [row("1", 700), row("2", 650)])
+    FakeSMTP.fail = True
+    client.post("/summary/send")
+    first = db.get(summary.FIRST_FROM, None)
+    assert first is not None and db.get(summary.LAST_RUN, None) is None
+    FakeSMTP.fail = False
+    client.post("/summary/send")
+    assert db.get(summary.FIRST_FROM, None) == first  # unchanged by the retry
+    assert FakeSMTP.sent[-1]["Subject"].startswith("Sleeper: 2 new deals")
+
+
+def test_photo_downloads_stop_when_the_cdn_is_down(env, monkeypatch):
+    s, db, _ = env
+    baseline(db, s, [row("1", 700)])
+    sweep_with(db, s, [row(str(i), 600 + i) for i in range(2, 12)])
+    calls = []
+    monkeypatch.setattr(summary, "_thumb", lambda url: calls.append(url) or None)
+    assert summary.run(db, s, lambda g, img: ("<p>x</p>", "x")) == "sent"
+    assert len(calls) == 3
+
+
+def test_summary_needs_an_absolute_public_url(env, monkeypatch):
+    monkeypatch.setenv("SLEEPER_PUBLIC_URL", "")
+    assert not config.load().summary_on

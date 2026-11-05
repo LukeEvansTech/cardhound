@@ -12,6 +12,7 @@ import logging
 import re
 import smtplib
 import ssl
+import threading
 import urllib.request
 from email.message import EmailMessage
 from email.utils import formataddr, make_msgid
@@ -24,6 +25,9 @@ log = logging.getLogger(__name__)
 
 RATING_ORDER = {"great": 0, "good": 1, "unknown": 2, "fair": 3, "high": 4}
 LAST_RUN = "summary_last_run"  # kv: the newest run the last sent summary covered
+FIRST_FROM = "summary_first_from"  # kv: where the first summary starts, until one is sent
+MAX_PHOTOS = 60  # download attempts per email
+LOCK = threading.Lock()  # one gather-send-save at a time
 MAX_CARDS = 40  # per email; the rest are a link to the Deals page
 
 
@@ -34,12 +38,15 @@ def gather(db: DB, s: Settings, now: dt.datetime | None = None) -> dict:
     newest = db.one("SELECT max(id) AS id FROM runs WHERE status != 'running'")
     last_run = int(newest["id"] or 0) if newest else 0
     after = db.get(LAST_RUN, None)
-    if after is None:  # first summary: the last day's runs
-        day_ago = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-        first = db.one("SELECT min(id) AS id FROM runs WHERE started >= ?", day_ago)
-        after = (first["id"] - 1) if first and first["id"] else last_run
+    if after is None:  # first summary: the day before the first look, kept until one is sent
+        after = db.get(FIRST_FROM, None)
+        if after is None:
+            day_ago = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            first = db.one("SELECT min(id) AS id FROM runs WHERE started >= ?", day_ago)
+            after = (first["id"] - 1) if first and first["id"] else last_run
+            db.put(FIRST_FROM, after)
     after = int(after)
 
     wants = {w["_id"]: w for w in db.wants()}
@@ -127,12 +134,19 @@ def _thumb(url: str) -> bytes | None:
 def send(s: Settings, g: dict, render) -> str:
     """Send the email; 'sent' or 'failed: <reason>'. ``render(g, img)`` returns (html, text)."""
     cids: dict[str, tuple[str, bytes]] = {}
-    for r in g["ending"] + g["new_graded"] + g["new_raw"]:
-        if r["img"] in cids or len(cids) >= MAX_CARDS:
-            continue
+    shown = g["ending"][:MAX_CARDS] + g["new_graded"][:MAX_CARDS] + g["new_raw"][:MAX_CARDS]
+    tried: set[str] = set()
+    misses = 0
+    for r in shown:
+        if r["img"] in tried or len(tried) >= MAX_PHOTOS or misses >= 3:
+            continue  # three misses in a row: the CDN is down, send without photos
+        tried.add(r["img"])
         data = _thumb(r["img"])
         if data:
             cids[r["img"]] = (make_msgid(domain="sleeper")[1:-1], data)
+            misses = 0
+        else:
+            misses += 1
     html, text = render(g, lambda r: f"cid:{cids[r['img']][0]}" if r["img"] in cids else "")
     msg = EmailMessage()
     msg["Subject"] = subject(g)
@@ -159,10 +173,11 @@ def send(s: Settings, g: dict, render) -> str:
 
 def run(db: DB, s: Settings, render) -> str:
     """Gather, send, and move the start point on only when the email went."""
-    g = gather(db, s)
-    res = send(s, g, render)
-    if res == "sent":
-        db.put(LAST_RUN, g["last_run"])
-    db.put("summary_last_result", f"{dt.datetime.now().isoformat(timespec='minutes')} {res}")
+    with LOCK:
+        g = gather(db, s)
+        res = send(s, g, render)
+        if res == "sent":
+            db.put(LAST_RUN, g["last_run"])
+        db.put("summary_last_result", f"{dt.datetime.now().isoformat(timespec='minutes')} {res}")
     log.info("summary email: %s", res)
     return res
