@@ -30,7 +30,7 @@ sweep (cron) ─▶ eBay search per want (Browse API or headless Chromium) ─�
   or more have been graded, otherwise the set's.
 - **Search source**: with `EBAY_CLIENT_ID` and `EBAY_CLIENT_SECRET` set (a production keyset from
   the eBay developer console), searches and listing photos go through the Browse API; without
-  them, through headless Chromium. The API's query has no `-word` exclusion, so excluded words are
+  them, through headless Chromium. The Browse API query has no `-word` exclusion, so excluded words are
   matched against titles instead, and it has no sold search.
 - **Sold comps**: eBay sends signed-out sold searches to a sign-in page, so sold prices are posted
   to `POST /api/sold` by a signed-in browser elsewhere.

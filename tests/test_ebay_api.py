@@ -37,15 +37,18 @@ class FakeHTTP:
         if self.statuses:
             return self.statuses.pop(0), b"{}"
         if "get_item_by_legacy_id" in url:
-            return 200, json.dumps(
-                {
-                    "image": {"imageUrl": "https://i.ebayimg.com/images/g/a/s-l500.jpg"},
-                    "additionalImages": [
-                        {"imageUrl": "https://i.ebayimg.com/images/g/b/s-l500.jpg"},
-                        {"imageUrl": "https://i.ebayimg.com/images/g/a/s-l500.jpg"},
-                    ],
-                }
-            ).encode()
+            return (
+                200,
+                json.dumps(
+                    {
+                        "image": {"imageUrl": "https://i.ebayimg.com/images/g/a/s-l500.jpg"},
+                        "additionalImages": [
+                            {"imageUrl": "https://i.ebayimg.com/images/g/b/s-l500.jpg"},
+                            {"imageUrl": "https://i.ebayimg.com/images/g/a/s-l500.jpg"},
+                        ],
+                    }
+                ).encode(),
+            )
         offset = int(dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))["offset"])
         return 200, json.dumps(self.pages[offset // 200]).encode()
 
@@ -74,6 +77,7 @@ def test_row_reads_like_a_search_card():
         ),
         NOW,
     )
+    assert r is not None
     assert r["id"] == "7" and r["price"] == "$12.00"
     assert match.shipping(r["text"]) == 4.5
     assert "3 bids" in r["text"] and "1d 4h left" in r["text"] and "or Best Offer" in r["text"]
@@ -82,7 +86,9 @@ def test_row_reads_like_a_search_card():
 
 def test_row_free_delivery_and_missing_price():
     free = item(8, "x", shippingOptions=[{"shippingCost": {"value": "0.00"}}])
-    assert match.shipping(row(free)["text"]) == 0.0
+    got = row(free)
+    assert got is not None
+    assert match.shipping(got["text"]) == 0.0
     assert row(item(9, "x", price=None)) is None
 
 

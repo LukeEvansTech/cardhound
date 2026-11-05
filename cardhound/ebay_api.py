@@ -101,7 +101,7 @@ def row(item: dict, now: dt.datetime | None = None) -> dict | None:
     if not item_id or not title or usd is None:
         return None
     bits = [title, f"${usd:,.2f}"]
-    ship = next(iter(item.get("shippingOptions") or []), {})
+    ship: dict = next(iter(item.get("shippingOptions") or []), {})
     cost = _money(ship.get("shippingCost"))
     if cost == 0:
         bits.append("Free delivery")
@@ -121,7 +121,13 @@ def row(item: dict, now: dt.datetime | None = None) -> dict | None:
     img = (item.get("image") or {}).get("imageUrl") or next(
         (i.get("imageUrl", "") for i in item.get("thumbnailImages") or []), ""
     )
-    return {"id": str(item_id), "title": title, "price": f"${usd:,.2f}", "text": " ".join(bits), "img": img}
+    return {
+        "id": str(item_id),
+        "title": title,
+        "price": f"${usd:,.2f}",
+        "text": " ".join(bits),
+        "img": img,
+    }
 
 
 class BrowseAPI:

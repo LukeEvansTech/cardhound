@@ -12,7 +12,7 @@ import json
 import logging
 import re
 import threading
-from typing import Callable
+from typing import Callable, Protocol
 
 from . import match, notify, photos, value
 from .config import Settings
@@ -20,7 +20,18 @@ from .db import DB
 from .ebay import Browser
 from .ebay_api import BrowseAPI
 
-Source = Browser | BrowseAPI  # both take website search URLs and return search-card rows
+
+class Source(Protocol):
+    """Where searches go: the headless browser or the Browse API (same URLs in, same rows out)."""
+
+    def __enter__(self) -> "Source": ...
+
+    def __exit__(self, *exc: object) -> None: ...
+
+    def search(self, url: str) -> list[dict] | None: ...
+
+    def item_photos(self, item_id: str) -> list[str]: ...
+
 
 log = logging.getLogger(__name__)
 LOCK = threading.Lock()
@@ -139,9 +150,7 @@ def retire_unsearched(db: DB, w: dict) -> None:
     )
 
 
-def photo_check(
-    db: DB, s: Settings, b: Source | None, wants: dict[int, dict], run_id: int
-) -> None:
+def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], run_id: int) -> None:
     """Score each live deal's photo against the official art, once per listing."""
     rows = db.all(
         "SELECT item_id, kind, want_id, img, art FROM listings WHERE active = 1 AND deal = 1 "
