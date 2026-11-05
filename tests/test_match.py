@@ -1,4 +1,4 @@
-from cardhound import match
+from sleeper import match
 
 EDWARD = {"set": "FMA", "who": "Edward Elric", "max": {"2": 1000}, "rawmax": {"2": 300}}
 DEFAULTS = {"psa_1star_max": 80, "raw_1star_max": 20}

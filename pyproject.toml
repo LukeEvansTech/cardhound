@@ -1,5 +1,5 @@
 [project]
-name = "cardhound"
+name = "sleeper"
 version = "0.1.0"
 description = "Trading-card deal finder: polls eBay for wanted cards, judges value and alerts with a deal page"
 requires-python = ">=3.12"

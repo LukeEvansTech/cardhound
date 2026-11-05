@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}cardhound{% endblock %}</title>
+<title>{% block title %}sleeper{% endblock %}</title>
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/">cardhound</a>
+  <a class="brand" href="/">sleeper</a>
   <nav>
     {% set here = request.url.path %}
     <a href="/" {{ 'aria-current=page' if here == '/' or here.startswith('/deal') }}>Deals</a>
@@ -20,6 +20,6 @@
 <main>
 {% block body %}{% endblock %}
 </main>
-<footer class="foot">cardhound {{ version }} · eBay.com US view, shipping to the Oregon address</footer>
+<footer class="foot">sleeper {{ version }} · eBay.com US view, shipping to the Oregon address</footer>
 </body>
 </html>

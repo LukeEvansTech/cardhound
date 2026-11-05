@@ -1,8 +1,8 @@
-"""cardhound command line.
+"""sleeper command line.
 
-python -m cardhound serve                 # web UI on :8080 plus the scheduled sweeps
-python -m cardhound sweep [--only Vegito] [--no-notify]
-python -m cardhound import export.json    # load wants, ceilings and pop from a JSON export
+python -m sleeper serve                 # web UI on :8080 plus the scheduled sweeps
+python -m sleeper sweep [--only Vegito] [--no-notify]
+python -m sleeper import export.json    # load wants, ceilings and pop from a JSON export
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from .db import DB
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="cardhound")
+    ap = argparse.ArgumentParser(prog="sleeper")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("serve")
     sw = sub.add_parser("sweep")

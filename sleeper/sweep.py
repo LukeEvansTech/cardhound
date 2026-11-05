@@ -443,7 +443,7 @@ def baseline(db: DB, s: Settings, run_id: int, deals: int) -> tuple[int, str]:
     """First alerting sweep: one summary alert; today's deals join the ledger only once it is sent."""
     res = notify.send(
         s.apprise_urls,
-        f"cardhound is watching: {deals} deals live now",
+        f"sleeper is watching: {deals} deals live now",
         "From now on each new deal gets its own alert.",
         s.link(f"/run/{run_id}"),
         "Open deals",

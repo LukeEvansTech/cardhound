@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Sweep #{{ run.id }} · cardhound{% endblock %}
+{% block title %}Sweep #{{ run.id }} · sleeper{% endblock %}
 {% block body %}
 <h1>Sweep #{{ run.id }} <span class="muted">{{ run.status }}</span></h1>
 <p class="muted">Started {{ run.started }} UTC{% if run.finished %}, finished {{ run.finished }}{% endif %}. {{ run.searches }} searches, {{ run.listings }} listings, {{ run.deals }} deals, {{ run.new_deals }} alerted ({{ run.alerts }}).</p>

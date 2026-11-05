@@ -1,4 +1,4 @@
-# Pylint config for cardhound. Read by super-linter (PYTHON_PYLINT_CONFIG_FILE defaults to this path).
+# Pylint config for sleeper. Read by super-linter (PYTHON_PYLINT_CONFIG_FILE defaults to this path).
 [MASTER]
 init-hook='import sys; sys.path.insert(0, ".")'
 
