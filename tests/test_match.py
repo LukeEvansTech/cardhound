@@ -175,6 +175,7 @@ def test_stated_stars_ignores_generic_art_words():
     assert match.stated_stars("Edward Elric FMA-1-012_p1 Parallel PSA 10") == "-"
     assert match.stated_stars("Edward SR*** PSA 10") == "3"
     assert match.stated_stars("Edward 1-star alt art") == "1"
+    assert match.stated_stars("Edward U* foil") == "1" and match.stated_stars("Edward R** x") == "2"
     w = {
         "set": "FMA",
         "who": "Edward",

@@ -127,7 +127,9 @@ def stated_stars(title: str) -> str:
     t = re.sub(r"\b([123])\s*[★☆]", r"\1 star", t)
     for n in ("3", "2", "1"):
         k = int(n)
-        if re.search(rf"\b{n} ?stars?\b|(?<![★☆]){'[★☆]' * k}(?![★☆])|sr\*{{{k}}}(?!\*)", t):
+        if re.search(
+            rf"\b{n} ?stars?\b|(?<![★☆]){'[★☆]' * k}(?![★☆])|\b(?:ur|sr|r|u|c)\*{{{k}}}(?!\*)", t
+        ):
             return n
     return "-"
 

@@ -373,7 +373,10 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         # An unticked checkbox is simply absent from the form.
         new_id = db.save_want(spec, want_id, enabled=form.get("enabled") == "on")
         # Its refs may have changed: photo verdicts are judged again on the next sweep.
-        db.run("UPDATE listings SET art = NULL WHERE want_id = ?", new_id)
+        saved = db.want(new_id) or {"_id": new_id}
+        family = [x["_id"] for x in db.wants() if match.comp_id(x) == match.comp_id(saved)]
+        for fid in family or [new_id]:  # a sibling's photo may now belong to this print, or not
+            db.run("UPDATE listings SET art = NULL WHERE want_id = ?", fid)
         saved = db.want(new_id)
         if saved:
             sweep.retire_unsearched(db, saved)
