@@ -165,6 +165,7 @@ def test_single_print_wants_check_bare_numbers_and_stars():
 
 def test_print_of_needs_one_print_and_reads_unknown_rarity():
     assert match.print_of({"cards": "UE15BT/EVA-1-082_p1 SR★, 081"}) is None  # another card too
+    assert match.print_of({"cards": "UE09BT/FMA-1-012_p1 SR★★, FMA-1-012_p2 SR★"}) is None
     assert match.print_of({"cards": "UE22BT/CSM-1-056_p1"}) == ("056", None)
     w = {"set": "CSM", "who": "Aki", "cards": "UE22BT/CSM-1-056_p1"}
     title = "Union Arena Chainsaw Man Aki CSM-1-056 2 Star PSA 10"

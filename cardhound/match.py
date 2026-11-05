@@ -90,6 +90,8 @@ def print_of(w: dict) -> tuple[str, str | None] | None:
     found = PRINT_ID.findall(cards)
     if len(found) != 1:
         return None
+    if len(re.findall(r"\b[A-Z]{2,4}-\d-(?:\d{3}|AP\d{2})", cards)) != 1:
+        return None  # "…012_p1 SR★★, FMA-1-012_p2 SR★" is two prints of one number
     num = found[0][1].split("-")[-1].split("_")[0].upper()
     if card_numbers(cards) != {num}:  # "…082_p1 SR★, 081" lists another card too
         return None

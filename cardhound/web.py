@@ -384,6 +384,14 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
 
     @app.post("/wants/{want_id}/delete")
     def want_delete(want_id: int):
+        gone = db.want(want_id)
+        rest = [x for x in db.wants() if x["_id"] != want_id]
+        # sold comps live under the card's family id; drop them once no remaining print uses them
+        orphans = {
+            cid
+            for cid in {want_id, match.comp_id(gone) if gone else want_id}
+            if not any(match.comp_id(x) == cid for x in rest)
+        }
         with db.tx() as c:
             c.execute(
                 "DELETE FROM alerts WHERE item_id IN (SELECT item_id FROM listings WHERE want_id = ?)",
@@ -391,8 +399,8 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             )
             c.execute("DELETE FROM listings WHERE want_id = ?", (want_id,))
             c.execute("DELETE FROM wants WHERE id = ?", (want_id,))
-            if not any(x.get("family") == want_id for x in db.wants()):
-                c.execute("DELETE FROM sold WHERE want_id = ?", (want_id,))  # no sibling uses them
+            for cid in orphans:
+                c.execute("DELETE FROM sold WHERE want_id = ?", (cid,))
         return RedirectResponse("/wants", status_code=303)
 
     @app.post("/wants/{want_id}/sweep")

@@ -608,3 +608,5 @@ def test_deleting_a_family_want_keeps_comps_its_siblings_use(env):
     )
     client.post(f"/wants/{fam}/delete")
     assert db.one("SELECT count(*) AS n FROM sold")["n"] == 1
+    client.post(f"/wants/{db.wants()[0]['_id']}/delete")  # the last print of the card
+    assert db.one("SELECT count(*) AS n FROM sold")["n"] == 0
