@@ -7,12 +7,14 @@ inline attachment so it shows in clients that block remote images (Outlook does 
 from __future__ import annotations
 
 import datetime as dt
+import fcntl
 import json
 import logging
 import re
 import smtplib
 import ssl
 import threading
+import time
 import urllib.request
 from email.message import EmailMessage
 from email.utils import formataddr, make_msgid
@@ -26,6 +28,7 @@ log = logging.getLogger(__name__)
 RATING_ORDER = {"great": 0, "good": 1, "unknown": 2, "fair": 3, "high": 4}
 LAST_RUN = "summary_last_run"  # kv: the newest run the last sent summary covered
 FIRST_FROM = "summary_first_from"  # kv: where the first summary starts, until one is sent
+LAST_HTML = "summary_last_html"  # kv: the last sent email, with web photos
 MAX_PHOTOS = 60  # download attempts per email
 LOCK = threading.Lock()  # one gather-send-save at a time
 MAX_CARDS = 40  # per email; the rest are a link to the Deals page
@@ -59,6 +62,8 @@ def gather(db: DB, s: Settings, now: dt.datetime | None = None) -> dict:
         r = dict(row)
         if (json.loads(r["art"]) if r["art"] else {}).get("verdict") == "differs":
             continue  # the photo shows another print: alerts withhold these too
+        if r["auction"] and r.get("ends") and r["ends"] < now.isoformat(timespec="minutes"):
+            continue  # ended since the last sweep saw it
         r["want"] = w
         r["v"] = sweep.verdict_for(db, s, r, w, cmp, pop)
         live.append(r)
@@ -171,19 +176,45 @@ def send(s: Settings, g: dict, render) -> str:
     return "sent"
 
 
+def web_img(r: dict) -> str:
+    """The listing photo from eBay's CDN, for the web copy of an email."""
+    return re.sub(r"s-l\d+\.", "s-l225.", r["img"] or "")
+
+
+def _settled(db: DB, s: Settings, wait: float = 3600) -> dict | None:
+    """gather() once no sweep is running, in this server or a CLI one; None after ``wait``."""
+    deadline = time.monotonic() + wait
+    if not sweep.LOCK.acquire(timeout=wait):  # pylint: disable=consider-using-with
+        return None
+    try:
+        with open(s.data_dir / "sweep.lock", "w", encoding="utf-8") as f:
+            while True:
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError:
+                    if time.monotonic() > deadline:
+                        return None
+                    time.sleep(5)
+            try:
+                return gather(db, s)
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+    finally:
+        sweep.LOCK.release()
+
+
 def run(db: DB, s: Settings, render) -> str:
-    """Gather, send, and move the start point on only when the email went."""
+    """Gather once sweeps settle, send, and move the start point on only when the email went."""
     with LOCK:
-        # wait out a running sweep: its listings are provisional until its checks finish
-        if not sweep.LOCK.acquire(timeout=3600):  # pylint: disable=consider-using-with
-            return "failed: a sweep ran for over an hour"
-        try:
-            g = gather(db, s)
-        finally:
-            sweep.LOCK.release()
-        res = send(s, g, render)
-        if res == "sent":
-            db.put(LAST_RUN, g["last_run"])
+        g = _settled(db, s)
+        if g is None:
+            res = "failed: a sweep ran for over an hour"
+        else:
+            res = send(s, g, render)
+            if res == "sent":
+                db.put(LAST_RUN, g["last_run"])
+                db.put(LAST_HTML, render(g, web_img)[0])  # the copy "This email on the web" opens
         db.put("summary_last_result", f"{dt.datetime.now().isoformat(timespec='minutes')} {res}")
     log.info("summary email: %s", res)
     return res

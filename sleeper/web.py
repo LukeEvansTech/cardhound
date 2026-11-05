@@ -541,6 +541,13 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             last_result=db.get("summary_last_result", ""),
         )
 
+    @app.get("/summary/last", response_class=HTMLResponse)
+    def summary_last():
+        html = db.get(summary.LAST_HTML, "")
+        if not html:
+            raise HTTPException(404, "no summary has been sent yet")
+        return HTMLResponse(html)
+
     @app.post("/summary/send")
     def summary_send():
         if not s.summary_on:

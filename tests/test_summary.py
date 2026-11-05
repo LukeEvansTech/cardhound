@@ -198,3 +198,22 @@ def test_plain_text_carries_sweep_health(env):
     client.post("/summary/send")
     text = FakeSMTP.sent[-1].get_body(("plain",)).get_content()
     assert "1 of 1 sweeps had a problem" in text
+
+
+def test_sent_email_has_a_web_copy_and_ended_auctions_drop_out(env):
+    s, db, client = env
+    assert client.get("/summary/last").status_code == 404
+    baseline(db, s, [row("1", 700)])
+    sweep_with(db, s, [row("1", 700), row("2", 650, "3 bids 2h 5m left"), row("3", 640)])
+    db.run("UPDATE listings SET ends = '2000-01-01T00:00' WHERE item_id = '2'")
+    client.post("/summary/send")
+    assert FakeSMTP.sent[-1]["Subject"] == "Sleeper: 1 new deal (1 graded)"
+    web = client.get("/summary/last")
+    assert web.status_code == 200 and "i.ebayimg.com" in web.text and "cid:" not in web.text
+
+
+def test_a_sweep_that_never_ends_fails_the_summary_loudly(env, monkeypatch):
+    s, db, _ = env
+    monkeypatch.setattr(summary, "_settled", lambda *_a, **_k: None)
+    assert summary.run(db, s, lambda g, img: ("x", "x")).startswith("failed")
+    assert "failed" in db.get("summary_last_result", "")
