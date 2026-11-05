@@ -283,9 +283,7 @@ def cache_key(s: Settings, w: dict, wants: dict[int, dict]) -> list[str]:
 
 
 def siblings(w: dict, wants: dict[int, dict]) -> list[int]:
-    """Other prints split from the same card."""
-    if not w.get("family"):
-        return []
+    """Other prints split from the same card (the card's own want included, if it still exists)."""
     fam = match.comp_id(w)
     return [x["_id"] for x in wants.values() if x["_id"] != w["_id"] and match.comp_id(x) == fam]
 
