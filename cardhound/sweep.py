@@ -12,7 +12,7 @@ import json
 import logging
 import re
 import threading
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 from . import match, notify, photos, value
 from .config import Settings
@@ -128,11 +128,13 @@ def fit(f: dict, w: dict, matched: int | None) -> tuple:
     on the strength of a sibling's higher ceiling."""
     one = match.print_of(w)
     title = f["title"]
-    named = bool(one) and (
-        one[0] in {n.upper() for n in match.TITLE_NO.findall(title)}
-        or one[0] in match.BARE_NO.findall(title)
-    )
-    starred = bool(one) and match.stars(title) == one[1] != "-"
+    named = starred = False
+    if one:
+        num, star = one
+        named = num in {n.upper() for n in match.TITLE_NO.findall(title)} or num in set(
+            match.BARE_NO.findall(title)
+        )
+        starred = match.stars(title) == star != "-"
     cap = f["cap"] if f["cap"] is not None else -1.0
     return (w["_id"] != matched, not named, not starred, cap, w["_id"])
 
@@ -149,10 +151,11 @@ def assign(db: DB, found: list[dict], wants: dict[int, dict]) -> dict[tuple[str,
     out = {}
     for key, fs in cands.items():
         fs = [f for f in fs if f["want_id"] in wants] or fs
-        out[key] = min(
-            fs,
-            key=lambda f: fit(f, wants.get(f["want_id"], {"_id": f["want_id"]}), matched.get(key)),
+        m = matched.get(key)
+        ranked = sorted(
+            (fit(f, wants.get(f["want_id"], {"_id": f["want_id"]}), m), i) for i, f in enumerate(fs)
         )
+        out[key] = fs[ranked[0][1]]
     return out
 
 
@@ -265,7 +268,7 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
 
 
 def move_to_sibling(
-    db: DB, s: Settings, r: dict, w: dict, wants: dict[int, dict], res: dict
+    db: DB, s: Settings, r: Any, w: dict, wants: dict[int, dict], res: dict
 ) -> bool:
     """A photo that is another print of the same card moves the listing to that print's want."""
     family = match.comp_id(w)
