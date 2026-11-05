@@ -17,15 +17,16 @@
   --panel: #fff;
   --well: #e3e7eb;
   --ink: #15202b;
-  --muted: #5f6b78;
+  --muted: #525d69;
   --line: #d5dae0;
-  --accent: #0e7c86;
+  --accent: #0a6870;
   --accent-ink: #fff;
-  --great: #1b8a4a;
-  --good: #4f9a3a;
-  --fair: #a87300;
-  --high: #c2361f;
-  --unknown: #6b7684;
+  --badge-ink: #fff;
+  --great: #14703d;
+  --good: #36702a;
+  --fair: #835800;
+  --high: #b02e18;
+  --unknown: #58626e;
   --shadow: 0 1px 0 rgb(21 32 43 / 6%), 0 8px 24px -16px rgb(21 32 43 / 35%);
   --radius: 14px;
   --radius-sm: 8px;
@@ -53,6 +54,7 @@
     --line: #263345;
     --accent: #3fb5bf;
     --accent-ink: #062226;
+  --badge-ink: #0f1620;
     --great: #45c27a;
     --good: #8cc56b;
     --fair: #e0a63a;
@@ -73,6 +75,7 @@
   --line: #263345;
   --accent: #3fb5bf;
   --accent-ink: #062226;
+  --badge-ink: #0f1620;
   --great: #45c27a;
   --good: #8cc56b;
   --fair: #e0a63a;
@@ -89,6 +92,7 @@
 
 html {
   scrollbar-color: var(--line) var(--bg);
+  scroll-padding-top: 76px; /* the sticky header never hides a focused control */
 }
 
 body {
@@ -324,6 +328,9 @@ button,
 /* Segmented control: plain links, so filters work without script. */
 .toggle {
   display: inline-flex;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
   padding: 3px;
   gap: 2px;
   background: var(--well);
@@ -331,7 +338,8 @@ button,
 }
 
 .toggle a {
-  padding: 6px 14px;
+  white-space: nowrap;
+  padding: 8px 14px;
   border-radius: 99px;
   color: var(--muted);
   text-decoration: none;
@@ -489,7 +497,7 @@ button,
   font-weight: 700;
   padding: 2px 10px;
   border-radius: 99px;
-  color: #fff;
+  color: var(--badge-ink);
   background: var(--unknown);
 }
 
@@ -926,6 +934,7 @@ textarea {
 
 .palette input:focus-visible {
   outline: none;
+  border-bottom: 2px solid var(--accent);
 }
 
 .palette ul {
@@ -980,6 +989,10 @@ textarea {
 /* --- small screens and motion --- */
 
 @media (width <= 600px) {
+  html {
+    scroll-padding-top: 120px;
+  }
+
   main {
     padding: 14px 12px 8px;
   }
@@ -1011,6 +1024,11 @@ textarea {
 
   .top .tools kbd {
     display: none;
+  }
+
+  .top nav {
+    order: 3;
+    width: 100%;
   }
 }
 
