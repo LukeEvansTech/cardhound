@@ -490,7 +490,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
                 "img": ebay_img(r["img"], 140),
                 "side": f"${r['v'].total:,.2f} {r['v'].rating}",
             }
-            for r in deals[:400]
+            for r in deals
         ]
         return {"wants": wants_out, "deals": deals_out}
 

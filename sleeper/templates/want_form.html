@@ -10,7 +10,7 @@
 </aside>
 <div>
 <h1>{{ w.who or 'Add a card to watch' }}</h1>
-{% if art | length == 1 %}<p class="muted">Watching the {{ art[0].label }}</p>{% endif %}
+{% if art | length == 1 and kept %}<p class="muted">Watching the {{ art[0].label }}</p>{% endif %}
 {% if error %}<p class="warn" role="alert">{{ error }}</p>{% endif %}
 <form method="post" action="/wants" class="want-form">
   {% if w._id %}<input type="hidden" name="_id" value="{{ w._id }}">{% endif %}
@@ -31,7 +31,7 @@
     {% for b in ['1', '2', '3', 'any'] %}<label class="mini">{{ b | star or 'any' }} <input name="rawmax_{{ b }}" inputmode="decimal" value="{{ (w.rawmax or {}).get(b, '') }}"></label>{% endfor %}
   </fieldset>
   <label>Card numbers <input name="cards" value="{{ w.cards or '' }}" placeholder="011, 012 (1★, 2★)"></label>
-  {% if art | length > 1 %}
+  {% if art | length > 1 or (art and not kept) %}
   <fieldset class="art-pick"><legend>Which of these arts do you want?</legend>
     <small>Untick an art and listings whose photo matches it stop counting as deals. A photo that also matches an art you kept still counts, so use the star ceilings above to choose between near-identical versions.</small>
     <div class="art-grid">
