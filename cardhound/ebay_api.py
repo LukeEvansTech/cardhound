@@ -61,9 +61,11 @@ def _fetch(req: urllib.request.Request) -> tuple[int, bytes]:
 def split_query(q: str) -> tuple[str, list[str]]:
     """eBay website query -> (Browse API q, excluded words)."""
     keep, drop = [], []
-    for word in q.split():
+    for word in re.findall(r'-?"[^"]*"|\S+', q):  # a quoted phrase is one term
         if word.startswith("-") and len(word) > 1:
-            drop.append(word[1:].lower())
+            phrase = word[1:].strip('"').lower()
+            if phrase:
+                drop.append(phrase)
         else:
             keep.append(word)
     return " ".join(keep)[:Q_MAX].strip(), drop
@@ -192,8 +194,6 @@ class BrowseAPI:
                 return json.loads(raw)
             if status == 401:
                 self._token = ""  # expired or revoked: fetch a new one on the next try
-            elif status == 404:
-                return {}
             elif 400 <= status < 500 and status != 429:
                 log.warning("browse api %s: HTTP %d", path, status)
                 return None

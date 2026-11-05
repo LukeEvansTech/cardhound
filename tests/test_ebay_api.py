@@ -61,6 +61,8 @@ def test_split_query_moves_exclusions_out():
     q, drop = split_query("union arena sr aki -psa -bgs -cgc -tag")
     assert q == "union arena sr aki"
     assert drop == ["psa", "bgs", "cgc", "tag"]
+    q, drop = split_query('card psa 10 -"first edition" -jp')
+    assert q == "card psa 10" and drop == ["first edition", "jp"]
 
 
 def test_row_reads_like_a_search_card():
@@ -122,6 +124,7 @@ def test_a_failed_later_page_fails_the_search():
             return super().__call__(req)
 
     assert api(SecondPageDown(pages)).search(match.search_url("aki")) is None
+    assert api(FakeHTTP([], statuses=[404])).search(match.search_url("aki")) is None
 
 
 def test_sold_search_is_empty_without_a_call():
