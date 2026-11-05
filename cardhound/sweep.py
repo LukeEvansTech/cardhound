@@ -272,7 +272,7 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
 
 
 def cache_key(s: Settings, w: dict, wants: dict[int, dict]) -> list[str]:
-    """What a photo verdict was judged against: the want's art and skips, and each sibling print's,
+    """What a photo verdict was judged against: the art and skips of this want and of each sibling print,
     since a listing that misses its own print may belong to a sibling."""
     key = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
     for sid in sorted(siblings(w, wants)):
