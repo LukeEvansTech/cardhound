@@ -410,6 +410,13 @@ def import_sold(db: DB, sold: dict) -> int:
         return c.total_changes - before
 
 
+def default_source(s: Settings) -> Source:
+    """The Browse API when a keyset is configured, otherwise headless Chromium."""
+    if s.ebay_api:
+        return BrowseAPI(s.ebay_client_id, s.ebay_client_secret)
+    return Browser(headless=s.headless, tries=s.fetch_tries)
+
+
 def run(
     db: DB,
     s: Settings,
@@ -451,13 +458,8 @@ def run(
         today = dt.date.today().isoformat()
         found, sold, searched, failed = [], [], [], []
         n = 0
-        factory: Callable[[], Source] = browser or (
-            (lambda: BrowseAPI(s.ebay_client_id, s.ebay_client_secret))
-            if s.ebay_api
-            else (lambda: Browser(headless=s.headless, tries=s.fetch_tries))
-        )
         say(f"source: {'eBay Browse API' if s.ebay_api and not browser else 'browser'}")
-        with factory() as b:
+        with (browser or (lambda: default_source(s)))() as b:
             for i, w in enumerate(wants, 1):
                 f, so, ok, bad = collect(b, w, blocked, defaults, today, s.ebay_sold)
                 n += len(ok) + len(bad)

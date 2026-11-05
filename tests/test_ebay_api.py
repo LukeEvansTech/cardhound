@@ -4,7 +4,7 @@ import datetime as dt
 import json
 import urllib.parse
 
-from cardhound import match
+from cardhound import config, match, sweep
 from cardhound.ebay_api import BrowseAPI, row, split_query, time_left
 
 NOW = dt.datetime(2026, 11, 5, 12, 0, tzinfo=dt.timezone.utc)
@@ -128,3 +128,13 @@ def test_item_photos_full_size_and_unique():
         "https://i.ebayimg.com/images/g/a/s-l1600.jpg",
         "https://i.ebayimg.com/images/g/b/s-l1600.jpg",
     ]
+
+
+def test_keyset_switches_the_sweep_to_the_api(tmp_path, monkeypatch):
+    monkeypatch.setenv("CARDHOUND_DATA", str(tmp_path))
+    monkeypatch.delenv("EBAY_CLIENT_ID", raising=False)
+    monkeypatch.delenv("EBAY_CLIENT_SECRET", raising=False)
+    assert not isinstance(sweep.default_source(config.load()), BrowseAPI)
+    monkeypatch.setenv("EBAY_CLIENT_ID", "id")
+    monkeypatch.setenv("EBAY_CLIENT_SECRET", "secret")
+    assert isinstance(sweep.default_source(config.load()), BrowseAPI)
