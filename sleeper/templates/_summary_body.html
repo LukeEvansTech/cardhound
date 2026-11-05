@@ -32,7 +32,7 @@
 {% endif %}
 {%- endmacro %}
 <div class="sx-paper" style="max-width:600px;margin:0 auto;padding:24px;background:#ffffff;color:{{ c.ink }};font-family:Arial,Helvetica,sans-serif;">
-  <p class="sx-muted" style="margin:0;font-size:13px;color:{{ c.muted }};">Sleeper, {{ g.now.strftime('%A %-d %B') }}</p>
+  <p class="sx-muted" style="margin:0;font-size:13px;color:{{ c.muted }};">Sleeper, {{ g.now | day }}</p>
   <h1 class="sx-ink" style="margin:4px 0 8px;font-size:24px;line-height:30px;color:{{ c.ink }};">
     {%- if g.new_count %}{{ g.new_count }} new deal{{ 's' if g.new_count != 1 }}{% else %}No new deals{% endif %}</h1>
   <p class="sx-ink" style="margin:0;font-size:14px;line-height:21px;color:{{ c.ink }};">
@@ -46,6 +46,6 @@
   {{ section('New graded deals', g.new_graded) }}
   {{ section('New raw deals', g.new_raw) }}
   <p class="sx-rule sx-muted" style="margin:28px 0 0;padding-top:16px;border-top:1px solid {{ c.rule }};font-size:13px;color:{{ c.muted }};">
-    <a href="{{ link('/') }}" class="sx-link" style="color:{{ c.accent }};">Open all deals</a> &nbsp;&middot;&nbsp; <a href="{{ link('/summary/last') }}" class="sx-link" style="color:{{ c.accent }};">This email on the web</a>
+    <a href="{{ link('/') }}" class="sx-link" style="color:{{ c.accent }};">Open all deals</a> &nbsp;&middot;&nbsp; <a href="{{ link('/summary/last') }}" class="sx-link" style="color:{{ c.accent }};">Latest summary on the web</a>
   </p>
 </div>

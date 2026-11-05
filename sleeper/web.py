@@ -115,6 +115,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         return f"{at:%a %H:%M}" if (at.date() - today).days < 6 else f"{at:%a %-d %b %H:%M}"
 
     tpl.env.filters["when"] = when
+    tpl.env.filters["day"] = lambda at: f"{at.astimezone(ZoneInfo(s.timezone)):%A %-d %B}"
     progress: list[str] = []
 
     def art_choices(w: dict) -> list[dict]:
