@@ -453,6 +453,45 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         return PlainTextResponse(res)
 
     # --- import, images ---
+    @app.get("/api/search")
+    def api_search() -> dict:
+        """What the Cmd-K search filters in the browser: every want and every live deal."""
+        counts = {
+            r["want_id"]: (r["n"], r["d"] or 0)
+            for r in db.all(
+                "SELECT want_id, count(*) AS n, sum(deal) AS d FROM listings WHERE active = 1 "
+                "GROUP BY want_id"
+            )
+        }
+        wants_out = []
+        for w in db.wants():
+            refs = photos.refs_for(w, s.refs_dir)
+            kept = [r for r in refs if r.name not in set_of(w.get("skip"))] or refs
+            n, d = counts.get(w["_id"], (0, 0))
+            wants_out.append(
+                {
+                    "name": w["who"],
+                    "set": w.get("set", ""),
+                    "href": f"/?want={w['_id']}&show=all",
+                    "img": f"/refs/{kept[0].name}" if kept else "",
+                    "side": f"{d} deal{'s' if d != 1 else ''}, {n} live",
+                }
+            )
+        deals = scored([dict(r) for r in db.all("SELECT * FROM listings WHERE active = 1 AND deal = 1")])
+        deals.sort(key=lambda r: (RATING_ORDER.get(r["v"].rating, 9), r["v"].total))
+        deals_out = [
+            {
+                "name": r["want"]["who"],
+                "set": r["want"].get("set", ""),
+                "kind": "psa 10" if r["kind"] == "psa" else "raw",
+                "href": f"/deal/{r['item_id']}/{r['kind']}",
+                "img": ebay_img(r["img"], 140),
+                "side": f"${r['v'].total:,.2f} {r['v'].rating}",
+            }
+            for r in deals[:400]
+        ]
+        return {"wants": wants_out, "deals": deals_out}
+
     @app.post("/api/import")
     async def api_import(request: Request) -> dict:
         """Load a wantwatch export: {wants, defaults, block, gem_rates, pop: {fetched, rows}, sold}."""

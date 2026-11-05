@@ -2,37 +2,38 @@
 {% block title %}Wants · sleeper{% endblock %}
 {% block body %}
 <section class="head-row">
-  <h1>Wants <span class="muted">({{ wants | length }})</span></h1>
+  <h1>{{ wants | length }} want{{ 's' if wants | length != 1 }}</h1>
   <a class="button primary" href="/wants/new">Add card</a>
 </section>
-<form class="filters" method="get">
-  <input type="hidden" name="view" value="{{ view }}">
-  <select name="set" onchange="this.form.submit()">
-    <option value="">All sets</option>
-    {% for x in sets %}<option {{ 'selected' if x == cur_set }}>{{ x }}</option>{% endfor %}
-  </select>
+<nav class="filters" aria-label="Filter wants">
+  <span class="toggle">
+    <a href="?view={{ view }}" class="{{ 'on' if not cur_set }}">All sets</a>
+    {% for x in sets %}<a href="?view={{ view }}&amp;set={{ x | urlencode }}" class="{{ 'on' if x == cur_set }}">{{ x }}</a>{% endfor %}
+  </span>
   <span class="toggle">
     <a href="?view=cards&amp;set={{ cur_set | urlencode }}" class="{{ 'on' if view == 'cards' }}">Cards</a>
     <a href="?view=table&amp;set={{ cur_set | urlencode }}" class="{{ 'on' if view == 'table' }}">Table</a>
   </span>
-</form>
+</nav>
 {% if view == 'cards' %}
 <div class="grid">
   {% for w in wants %}
   {% set c = counts.get(w._id, (0, 0)) %}
-  <article class="tile want-tile {{ '' if w._enabled else 'off' }}">
-    {% set t = thumbs.get(w._id) %}
-    {% if t %}<img loading="lazy" src="/refs/{{ t.name }}" alt="">{% else %}<span class="noart">{{ w.set }}</span>{% endif %}
-    <div class="tile-body">
-      <strong class="tile-name"><a class="tile-link" href="/?want={{ w._id }}&amp;show=all">{{ w.who }}</a></strong>
-      <span class="muted small">{{ w.set }}{% if t and t.total > 1 %} · {{ t.kept }} of {{ t.total }} arts{% endif %}{% if not w._enabled %} · paused{% endif %}</span>
-      <span class="small">PSA {% for k, v in (w.max or {}).items() %}{{ k | star or k }} {{ v | money }} {% else %}<span class="muted">default</span>{% endfor %}</span>
-      <span class="small">Raw {% if w.raw is sameas false %}<span class="muted">off</span>{% else %}{% for k, v in (w.rawmax or {}).items() %}{{ k | star or k }} {{ v | money }} {% endfor %}{% if w.raw_max %}{{ w.raw_max | money }}{% elif not w.rawmax %}<span class="muted">default</span>{% endif %}{% endif %}</span>
-      <span class="small tile-actions">
-        <a href="/?want={{ w._id }}&amp;show=all">{{ c[0] }} live</a> ·
-        <a href="/?want={{ w._id }}&amp;show=deals"><b>{{ c[1] or 0 }} deal{{ 's' if (c[1] or 0) != 1 }}</b></a> ·
-        <a href="/wants/{{ w._id }}">Edit</a>
-      </span>
+  {% set t = thumbs.get(w._id) %}
+  <article class="tile want-tile{{ ' off' if not w._enabled }}{{ ' has-deals' if c[1] }}">
+    <div class="well">{% if t %}<img loading="lazy" src="/refs/{{ t.name }}" alt="">{% else %}<span class="noart">{{ w.set }}</span>{% endif %}</div>
+    <div class="label">
+      <strong class="name"><a class="tile-link" href="/?want={{ w._id }}&amp;show=all">{{ w.who }}</a></strong>
+      <span class="meta"><span>{{ w.set }}</span>{% if t and t.total > 1 %}<span>{{ t.kept }} of {{ t.total }} arts</span>{% endif %}{% if not w._enabled %}<span>paused</span>{% endif %}</span>
+      <a class="grade" href="/?want={{ w._id }}&amp;show=deals"><span class="price">{{ c[1] or 0 }}</span><span class="rating {{ 'rating-great' if c[1] else 'muted' }}">deal{{ 's' if (c[1] or 0) != 1 }}</span></a>
+    </div>
+    <div class="ceilings muted">
+      <span>PSA 10: {% for k, v in (w.max or {}).items() %}{{ k | star or k }} {{ v | money }} {% else %}default{% endfor %}</span>
+      <span>Raw: {% if w.raw is sameas false %}off{% else %}{% for k, v in (w.rawmax or {}).items() %}{{ k | star or k }} {{ v | money }} {% endfor %}{% if w.raw_max %}{{ w.raw_max | money }}{% elif not w.rawmax %}default{% endif %}{% endif %}</span>
+    </div>
+    <div class="tile-actions">
+      <a href="/?want={{ w._id }}&amp;show=all">{{ c[0] }} live listing{{ 's' if c[0] != 1 }}</a>
+      <a href="/wants/{{ w._id }}">Edit</a>
     </div>
   </article>
   {% endfor %}

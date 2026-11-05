@@ -1,11 +1,15 @@
 {% extends "base.html" %}
+{% macro qs(show_=show, kind_=kind, set_=cur_set) -%}
+?show={{ show_ }}{% if kind_ %}&amp;kind={{ kind_ }}{% endif %}{% if set_ %}&amp;set={{ set_ | urlencode }}{% endif %}{% if cur_want %}&amp;want={{ cur_want._id }}{% endif %}
+{%- endmacro %}
+{% block title %}{{ cur_want.who if cur_want else ('Deals' if show == 'deals' else 'Live listings') }} · sleeper{% endblock %}
 {% block body %}
 {% if cur_want %}
 <section class="head-row want-head">
   <div>
     <p class="muted small"><a href="/wants">Wants</a> / {{ cur_want.set }}</p>
-    <h1>{{ cur_want.who }} <span class="muted">({{ total }} {{ 'deal' if show == 'deals' else 'live' }}{{ 's' if total != 1 and show == 'deals' }})</span></h1>
-    {% if cur_want.cards %}<p class="muted small">{{ cur_want.cards }}</p>{% endif %}
+    <h1>{{ cur_want.who }}</h1>
+    <p class="muted">{{ total }} {{ 'deal' if show == 'deals' else 'live listing' }}{{ 's' if total != 1 }}{% if cur_want.cards %}. {{ cur_want.cards }}{% endif %}</p>
   </div>
   <div class="actions">
     <a class="button" href="/wants/{{ cur_want._id }}">Edit want</a>
@@ -14,31 +18,31 @@
 </section>
 {% else %}
 <section class="head-row">
-  <h1>{{ 'Deals' if show == 'deals' else 'All live listings' }} <span class="muted">({{ total }})</span></h1>
-  <p class="muted">
+  <h1>{% if show == 'deals' %}{{ total }} deal{{ 's' if total != 1 }}{% else %}{{ total }} live listing{{ 's' if total != 1 }}{% endif %}</h1>
+  <p class="muted small">
     {% if running %}A sweep is running now. {% endif %}
-    {% if last %}Last sweep #{{ last.id }} {{ last.status }}, started {{ last.started }} UTC: {{ last.listings }} listings, {{ last.deals }} deals.{% else %}No sweep yet: <a href="/ops">start one</a> or add cards.{% endif %}
+    {% if last %}Last sweep {{ last.status }}, started {{ last.started }} UTC: {{ last.listings }} listings checked.{% else %}No sweep yet: <a href="/ops">start one</a> or add cards.{% endif %}
   </p>
 </section>
 {% endif %}
-<form class="filters" method="get">
-  {% if cur_want %}<input type="hidden" name="want" value="{{ cur_want._id }}">{% endif %}
-  <select name="show" onchange="this.form.submit()">
-    <option value="deals" {{ 'selected' if show == 'deals' }}>Deals only</option>
-    <option value="all" {{ 'selected' if show == 'all' }}>All live listings</option>
-  </select>
-  {% if not cur_want %}<select name="set" onchange="this.form.submit()">
-    <option value="">All sets</option>
-    {% for x in sets %}<option {{ 'selected' if x == cur_set }}>{{ x }}</option>{% endfor %}
-  </select>{% endif %}
-  <select name="kind" onchange="this.form.submit()">
-    <option value="">PSA 10 and raw</option>
-    <option value="psa" {{ 'selected' if kind == 'psa' }}>PSA 10 only</option>
-    <option value="raw" {{ 'selected' if kind == 'raw' }}>Raw only</option>
-  </select>
-  <button>Filter</button>
-</form>
+<nav class="filters" aria-label="Filter listings">
+  <span class="toggle">
+    <a href="{{ qs(show_='deals') }}" class="{{ 'on' if show == 'deals' }}">Deals</a>
+    <a href="{{ qs(show_='all') }}" class="{{ 'on' if show == 'all' }}">All live</a>
+  </span>
+  <span class="toggle">
+    <a href="{{ qs(kind_='') }}" class="{{ 'on' if not kind }}">PSA 10 and raw</a>
+    <a href="{{ qs(kind_='psa') }}" class="{{ 'on' if kind == 'psa' }}">PSA 10</a>
+    <a href="{{ qs(kind_='raw') }}" class="{{ 'on' if kind == 'raw' }}">Raw</a>
+  </span>
+  {% if not cur_want %}
+  <span class="toggle">
+    <a href="{{ qs(set_='') }}" class="{{ 'on' if not cur_set }}">All sets</a>
+    {% for x in sets %}<a href="{{ qs(set_=x) }}" class="{{ 'on' if x == cur_set }}">{{ x }}</a>{% endfor %}
+  </span>
+  {% endif %}
+</nav>
 <div class="grid">
-{% for r in rows %}{% include "_card.html" %}{% else %}<p class="muted">Nothing here yet.</p>{% endfor %}
+{% for r in rows %}{% include "_card.html" %}{% else %}<p class="muted">{% if show == 'deals' %}No deals right now. <a href="{{ qs(show_='all') }}">See every live listing</a> or raise a ceiling on the Wants page.{% else %}No live listings yet. The next sweep will look again.{% endif %}</p>{% endfor %}
 </div>
 {% endblock %}
