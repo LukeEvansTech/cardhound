@@ -82,15 +82,21 @@ def card_numbers(cards: str) -> set[str]:
 BARE_NO = re.compile(r"(?<![\w/.-])#?(0\d{2})(?![\w/])")
 
 
-def print_of(w: dict) -> tuple[str, str] | None:
-    """(card number, star bucket) when the want is exactly one print, e.g. ("012", "2") for
-    "UE09BT/FMA-1-012_p1 SR★★"; the bucket is "-" for a print with no stars (a promo)."""
-    found = PRINT_ID.findall(w.get("cards") or "")
+def print_of(w: dict) -> tuple[str, str | None] | None:
+    """(card number, star bucket) when the whole card list is one print, e.g. ("012", "2") for
+    "UE09BT/FMA-1-012_p1 SR★★". The bucket is "-" for a rarity with no stars (a promo's "UR") and
+    None when no rarity is written, so the star count is unknown and not checked."""
+    cards = w.get("cards") or ""
+    found = PRINT_ID.findall(cards)
     if len(found) != 1:
         return None
-    m = re.search(PRINT_ID.pattern + r"\s+([A-Z]{1,3})(★*)", w["cards"])
-    star = str(len(m.group(4))) if m and m.group(4) else "-"
-    return found[0][1].split("-")[-1].split("_")[0].upper(), star
+    num = found[0][1].split("-")[-1].split("_")[0].upper()
+    if card_numbers(cards) != {num}:  # "…082_p1 SR★, 081" lists another card too
+        return None
+    m = re.search(PRINT_ID.pattern + r"\s+([A-Z]{1,3})(★*)(?=[\s,]|$)", cards)
+    if not m:
+        return num, None
+    return num, str(len(m.group(4))) if m.group(4) else "-"
 
 
 def comp_id(w: dict) -> int:
@@ -161,7 +167,7 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
             bare = set(BARE_NO.findall(title)) if not seen else set()
             if bare and one[0] not in bare:
                 return False
-            if stars(title) not in ("-", one[1]):
+            if one[1] is not None and stars(title) not in ("-", one[1]):
                 return False
     if FOREIGN.search(t) or FOREIGN_SELLER.search(text):
         return False

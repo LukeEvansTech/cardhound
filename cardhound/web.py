@@ -387,8 +387,9 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
                 (want_id,),
             )
             c.execute("DELETE FROM listings WHERE want_id = ?", (want_id,))
-            c.execute("DELETE FROM sold WHERE want_id = ?", (want_id,))
             c.execute("DELETE FROM wants WHERE id = ?", (want_id,))
+            if not any(x.get("family") == want_id for x in db.wants()):
+                c.execute("DELETE FROM sold WHERE want_id = ?", (want_id,))  # no sibling uses them
         return RedirectResponse("/wants", status_code=303)
 
     @app.post("/wants/{want_id}/sweep")

@@ -594,3 +594,17 @@ def test_sold_comps_for_a_split_card_go_to_its_family(env):
     }
     assert client.post("/api/sold", json={"sold": sold}).json()["added"] == 1
     assert db.one("SELECT want_id FROM sold")["want_id"] == 900
+
+
+def test_deleting_a_family_want_keeps_comps_its_siblings_use(env):
+    _, db, client = env
+    client.post("/api/import", json={"wants": [{"set": "FMA", "who": "Edward Elric", "q": "e"}]})
+    fam = db.wants()[0]["_id"]
+    client.post("/api/import", json={"wants": [{**SPLIT[0], "family": fam}]})
+    db.run(
+        "INSERT INTO sold (item_id, want_id, kind, star, usd, date, title) "
+        "VALUES ('s1', ?, 'psa', '2', 900, '2026-11-01', 'x')",
+        fam,
+    )
+    client.post(f"/wants/{fam}/delete")
+    assert db.one("SELECT count(*) AS n FROM sold")["n"] == 1

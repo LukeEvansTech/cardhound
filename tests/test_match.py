@@ -161,3 +161,11 @@ def test_single_print_wants_check_bare_numbers_and_stars():
     assert not keep("Union Arena Edward Elric #040 2 star psa 10")
     assert not keep("Union Arena Edward Elric 1 star psa 10")
     assert match.comp_id({"_id": 5, "family": 2}) == 2 and match.comp_id({"_id": 5}) == 5
+
+
+def test_print_of_needs_one_print_and_reads_unknown_rarity():
+    assert match.print_of({"cards": "UE15BT/EVA-1-082_p1 SR★, 081"}) is None  # another card too
+    assert match.print_of({"cards": "UE22BT/CSM-1-056_p1"}) == ("056", None)
+    w = {"set": "CSM", "who": "Aki", "cards": "UE22BT/CSM-1-056_p1"}
+    title = "Union Arena Chainsaw Man Aki CSM-1-056 2 Star PSA 10"
+    assert match.keep(w, "psa", title, title)  # unknown rarity: any star count passes

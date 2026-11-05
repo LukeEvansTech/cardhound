@@ -148,10 +148,13 @@ def assign(db: DB, found: list[dict], wants: dict[int, dict]) -> dict[tuple[str,
     for r in db.all("SELECT item_id, kind, want_id, art FROM listings WHERE art IS NOT NULL"):
         if json.loads(r["art"]).get("verdict") == "match":
             matched[(r["item_id"], r["kind"])] = r["want_id"]
+    live = {x["_id"] for x in db.wants()}
     out = {}
     for key, fs in cands.items():
         fs = [f for f in fs if f["want_id"] in wants] or fs
         m = matched.get(key)
+        if m is not None and m in live and m not in {f["want_id"] for f in fs}:
+            continue  # its photo placed it on a print this sweep didn't search; leave it there
         ranked = sorted(
             (fit(f, wants.get(f["want_id"], {"_id": f["want_id"]}), m), i) for i, f in enumerate(fs)
         )
@@ -211,12 +214,13 @@ def retire_unsearched(db: DB, w: dict) -> None:
 def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], run_id: int) -> None:
     """Score each live deal's photo against the official art, once per listing."""
     rows = db.all(
-        "SELECT item_id, kind, want_id, img, art, star, usd, ship FROM listings "
+        "SELECT item_id, kind, want_id, img, art, star, usd, ship, title FROM listings "
         "WHERE active = 1 AND deal = 1 "
         "AND last_run = ?",
         run_id,
     )
     pages = ITEM_PAGES_PER_RUN
+    everyone = {x["_id"]: x for x in db.wants(enabled_only=True)}  # siblings outside this sweep too
     for r in rows:
         w = wants.get(r["want_id"])
         old = json.loads(r["art"]) if r["art"] else {}
@@ -256,7 +260,7 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
         if (
             res["verdict"] != "match"
             and res.get("photo")
-            and move_to_sibling(db, s, r, w, wants, res)
+            and move_to_sibling(db, s, r, w, everyone, res)
         ):
             continue
         db.run(
@@ -272,7 +276,14 @@ def move_to_sibling(
 ) -> bool:
     """A photo that is another print of the same card moves the listing to that print's want."""
     family = match.comp_id(w)
-    sibs = [x for x in wants.values() if x["_id"] != w["_id"] and match.comp_id(x) == family]
+    sibs = [
+        x
+        for x in wants.values()
+        if x["_id"] != w["_id"]
+        and match.comp_id(x) == family
+        and r["kind"] in {k for k, _ in match.searches(x)}  # never into a print with raw off
+        and match.keep(x, r["kind"], r["title"], r["title"])  # star tier and number must agree
+    ]
     if not sibs or not w.get("family") and not any(x.get("family") for x in sibs):
         return False
     key = res["photo"].rsplit(".", 1)[0]  # the photo already downloaded for the best score
