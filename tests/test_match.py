@@ -183,3 +183,8 @@ def test_stated_stars_ignores_generic_art_words():
     }
     t = "Union Arena Edward Elric FMA-1-012_p1 Parallel PSA 10"
     assert match.keep(w, "psa", t, t)
+
+
+def test_spaced_serial_is_not_a_card_number():
+    assert match.BARE_NO.findall("Union Arena Edward Elric 3 Star Serial #001 /250 PSA 10") == []
+    assert match.BARE_NO.findall("Union Arena Lanfan (023) SR*") == ["023"]

@@ -278,6 +278,7 @@ def cache_key(s: Settings, w: dict, wants: dict[int, dict]) -> list[str]:
     for sid in sorted(siblings(w, wants)):
         sib = wants[sid]
         key += [f"sib:{sid}:{x}" for x in photos.ref_key(sib, photos.refs_for(sib, s.refs_dir))]
+        key.append(f"sib:{sid}:raw={sib.get('raw', True) is not False}")
     return key
 
 

@@ -79,7 +79,7 @@ def card_numbers(cards: str) -> set[str]:
 
 # A card number written on its own in a title: "#023", "(023)", " 023 ". Only zero-led numbers, so a
 # grade, a pop count or a "/250" serial is never read as one.
-BARE_NO = re.compile(r"(?<![\w/.-])#?(0\d{2})(?![\w/])")
+BARE_NO = re.compile(r"(?<![\w/.-])#?(0\d{2})(?![\w/])(?!\s*/)")  # "#001 /250" is a serial
 
 
 def print_of(w: dict) -> tuple[str, str | None] | None:
