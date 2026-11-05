@@ -17,7 +17,7 @@ import threading
 import time
 import urllib.request
 from email.message import EmailMessage
-from email.utils import formataddr, make_msgid
+from email.utils import formataddr, formatdate, make_msgid
 
 from . import sweep
 from .config import Settings
@@ -159,6 +159,8 @@ def send(s: Settings, g: dict, render) -> str:
     msg["Subject"] = subject(g)
     msg["From"] = formataddr(("Sleeper", s.mail_from))
     msg["To"] = s.summary_to
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=s.mail_from.rpartition("@")[2] or "sleeper")
     msg.set_content(text)
     msg.add_alternative(html, subtype="html")
     body = msg.get_body(("html",))

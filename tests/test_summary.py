@@ -110,6 +110,7 @@ def test_summary_emails_new_deals_with_photos_and_moves_on(env):
     msg = FakeSMTP.sent[-1]
     assert msg["Subject"] == "Sleeper: 1 new deal (1 graded)"
     assert msg["To"] == "luke@example.com" and "noreply@example.com" in msg["From"]
+    assert msg["Message-ID"].endswith("@example.com>") and msg["Date"]
     html = msg.get_body(("html",)).get_content()
     assert "cid:" in html and "https://sleeper.example/deal/2/psa" in html
     images = [p for p in msg.walk() if p.get_content_type() == "image/jpeg"]
