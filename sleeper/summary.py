@@ -43,12 +43,12 @@ def gather(db: DB, s: Settings, now: dt.datetime | None = None) -> dict:
 
     wants = {w["_id"]: w for w in db.wants()}
     cmp, pop = sweep.context(db)
-    live = []
-    for r in db.all("SELECT * FROM listings WHERE active = 1 AND deal = 1"):
-        w = wants.get(r["want_id"])
+    live: list[dict] = []
+    for row in db.all("SELECT * FROM listings WHERE active = 1 AND deal = 1"):
+        w = wants.get(row["want_id"])
         if not w:
             continue
-        r = dict(r)
+        r = dict(row)
         r["want"] = w
         r["v"] = sweep.verdict_for(db, s, r, w, cmp, pop)
         live.append(r)
@@ -56,7 +56,10 @@ def gather(db: DB, s: Settings, now: dt.datetime | None = None) -> dict:
         (a["item_id"], a["kind"])
         for a in db.all("SELECT item_id, kind FROM run_alerts WHERE run_id > ?", after)
     }
-    best = lambda r: (RATING_ORDER.get(r["v"].rating, 9), r["v"].total)  # noqa: E731
+
+    def best(r: dict) -> tuple:
+        return (RATING_ORDER.get(r["v"].rating, 9), r["v"].total)
+
     new = sorted((r for r in live if (r["item_id"], r["kind"]) in alerted), key=best)
     soon = (now + dt.timedelta(days=1)).isoformat(timespec="minutes")
     ending = sorted(

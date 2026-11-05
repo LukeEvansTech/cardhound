@@ -15,7 +15,7 @@ class FakeSMTP:
     sent: list = []
     fail = False
 
-    def __init__(self, host, port, timeout=None):
+    def __init__(self, host, *_args, **_kw):
         self.host = host
 
     def __enter__(self):
