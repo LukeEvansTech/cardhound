@@ -59,7 +59,7 @@
     --line: #263345;
     --accent: #3fb5bf;
     --accent-ink: #062226;
-  --badge-ink: #0f1620;
+    --badge-ink: #0f1620;
     --great: #45c27a;
     --good: #8cc56b;
     --fair: #e0a63a;
@@ -180,115 +180,6 @@ h2 {
   font-stretch: 110%;
   font-weight: 700;
   margin: 1.8em 0 0.5em;
-}
-
-/* --- header --- */
-
-.top {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 22px;
-  align-items: center;
-  padding: 10px 20px;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--line);
-}
-
-.brand {
-  color: var(--ink);
-  text-decoration: none;
-  font-size: 1.35rem;
-  font-stretch: 125%;
-  font-weight: 900;
-  letter-spacing: -0.04em;
-}
-
-.top nav {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.top nav a {
-  position: relative;
-  color: var(--muted);
-  text-decoration: none;
-  padding: 8px 10px;
-  font-weight: 600;
-  transition: color var(--m-out) var(--m-ease);
-}
-
-/* Nav words rest bare; a 1px line draws under them on hover, a 2px bar marks the current page. */
-.top nav a::after {
-  content: "";
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 2px;
-  height: 1px;
-  background: currentcolor;
-  transform: scaleX(0);
-  transform-origin: right;
-  transition: transform var(--m-out) var(--m-ease);
-}
-
-.top nav a:hover {
-  color: var(--ink);
-  transition-duration: var(--m-in);
-}
-
-.top nav a:hover::after {
-  transform: scaleX(1);
-  transform-origin: left;
-  transition-duration: var(--m-in);
-}
-
-.top nav a[aria-current="page"] {
-  color: var(--ink);
-}
-
-.top nav a[aria-current="page"]::after {
-  height: 2px;
-  transform: scaleX(1);
-}
-
-.top .tools {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.top .tools button {
-  min-height: 38px;
-  padding: 6px 12px;
-  border-radius: 99px;
-  color: var(--muted);
-}
-
-.top .tools button:hover {
-  color: var(--ink);
-}
-
-kbd {
-  font: inherit;
-  font-size: 0.75rem;
-  padding: 1px 6px;
-  margin-left: 6px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--muted);
-}
-
-.foot {
-  max-width: 1240px;
-  margin: 28px auto;
-  padding: 0 20px;
-  color: var(--muted);
-  font-size: 0.85rem;
 }
 
 /* --- text helpers --- */
@@ -447,58 +338,6 @@ button,
   color: inherit;
   text-decoration: none;
   overflow: hidden;
-}
-
-a.tile,
-.want-tile {
-  transition:
-    transform 180ms var(--m-ease),
-    border-color var(--m-out) var(--m-ease),
-    box-shadow 180ms var(--m-ease);
-}
-
-a.tile:hover,
-.want-tile:hover {
-  transform: translateY(-2px);
-  border-color: var(--muted);
-  box-shadow:
-    var(--shadow),
-    0 12px 24px -12px color-mix(in srgb, var(--ink) 10%, transparent);
-}
-
-.tile .well {
-  overflow: hidden;
-}
-
-.tile .well img {
-  transition: transform 600ms var(--m-ease);
-}
-
-a.tile:hover .well img,
-.want-tile:hover .well img {
-  transform: scale(1.03);
-}
-
-/* The foil edge: only a steal (landed at 40% of market or less) gets it. */
-.tile.steal {
-  border: 2px solid transparent;
-  background:
-    linear-gradient(var(--panel), var(--panel)) padding-box,
-    var(--foil) border-box;
-}
-
-.tile .well {
-  display: grid;
-  place-items: center;
-  padding: 10px 10px 0;
-  background: var(--well);
-}
-
-.tile img {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 3 / 4;
-  object-fit: contain;
 }
 
 /* The label band: name and set on the left, the landed price in the grade box. */
@@ -970,7 +809,8 @@ textarea {
 .want-tile .tile-actions a {
   text-decoration: none;
   font-weight: 600;
-  background: linear-gradient(currentcolor, currentcolor) right bottom / 0 1px no-repeat;
+  background: linear-gradient(currentcolor, currentcolor) right bottom / 0 1px
+    no-repeat;
   transition: background-size var(--m-out) var(--m-ease);
 }
 
@@ -1172,6 +1012,162 @@ textarea {
   color: var(--muted);
 }
 
+/* --- tile motion: lift, border and art zoom --- */
+
+.tile {
+  transition:
+    transform 180ms var(--m-ease),
+    border-color var(--m-out) var(--m-ease),
+    box-shadow 180ms var(--m-ease);
+}
+
+.tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--muted);
+  box-shadow:
+    var(--shadow),
+    0 12px 24px -12px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.tile .well img {
+  transition: transform 600ms var(--m-ease);
+}
+
+.tile:hover .well img {
+  transform: scale(1.03);
+}
+
+/* The foil edge: only a steal (landed at 40% of market or less) gets it. */
+.tile.steal {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    var(--foil) border-box;
+}
+
+.tile .well {
+  display: grid;
+  place-items: center;
+  padding: 10px 10px 0;
+  background: var(--well);
+}
+
+.tile img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+}
+
+/* --- header --- */
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  align-items: center;
+  padding: 10px 20px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 1.35rem;
+  font-stretch: 125%;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.top nav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.top nav a {
+  position: relative;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 8px 10px;
+  font-weight: 600;
+  transition: color var(--m-out) var(--m-ease);
+}
+
+/* Nav words rest bare; a 1px line draws under them on hover, a 2px bar marks the current page. */
+.top nav a::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 1px;
+  background: currentcolor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--m-out) var(--m-ease);
+}
+
+.top nav a:hover {
+  color: var(--ink);
+  transition-duration: var(--m-in);
+}
+
+.top nav a:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+  transition-duration: var(--m-in);
+}
+
+.top nav a[aria-current="page"] {
+  color: var(--ink);
+}
+
+.top nav a[aria-current="page"]::after {
+  height: 2px;
+  transform: scaleX(1);
+}
+
+.top .tools {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.top .tools button {
+  min-height: 38px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  color: var(--muted);
+}
+
+.top .tools button:hover {
+  color: var(--ink);
+}
+
+kbd {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+}
+
+.foot {
+  max-width: 1240px;
+  margin: 28px auto;
+  padding: 0 20px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 /* --- small screens and motion --- */
 
 @media (width <= 600px) {
@@ -1226,10 +1222,8 @@ textarea {
     animation: none !important;
   }
 
-  a.tile:hover,
-  .want-tile:hover,
-  a.tile:hover .well img,
-  .want-tile:hover .well img,
+  .tile:hover,
+  .tile:hover .well img,
   button:hover,
   .button:hover,
   button:active,

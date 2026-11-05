@@ -3,8 +3,10 @@
   const root = document.documentElement;
 
   // --- theme ---
-  const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const current = () => root.dataset.theme || (prefersDark() ? "dark" : "light");
+  const prefersDark = () =>
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const current = () =>
+    root.dataset.theme || (prefersDark() ? "dark" : "light");
   const label = (btn) => {
     btn.textContent = current() === "dark" ? "Light" : "Dark";
   };
@@ -15,7 +17,7 @@
       root.dataset.theme = next;
       try {
         localStorage.setItem("theme", next);
-      } catch (e) {
+      } catch (_e) {
         /* private mode: the choice lasts this page only */
       }
       label(btn);
@@ -33,7 +35,9 @@
 
   const load = async () => {
     if (index) return index;
-    const res = await fetch("/api/search", { headers: { Accept: "application/json" } });
+    const res = await fetch("/api/search", {
+      headers: { Accept: "application/json" },
+    });
     index = res.ok ? await res.json() : { wants: [], deals: [] };
     return index;
   };
@@ -48,7 +52,15 @@
   const render = () => {
     list.replaceChildren();
     if (!hits.length) {
-      list.append(el("li", "empty", input.value ? "Nothing matches. Try a card name or a set like FMA." : "Type a card name or a set."));
+      list.append(
+        el(
+          "li",
+          "empty",
+          input.value
+            ? "Nothing matches. Try a card name or a set like FMA."
+            : "Type a card name or a set.",
+        ),
+      );
       return;
     }
     hits.forEach((h, i) => {
@@ -67,16 +79,26 @@
       li.append(a);
       list.append(li);
     });
-    list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+    list
+      .querySelector('[aria-selected="true"]')
+      ?.scrollIntoView({ block: "nearest" });
   };
 
   const search = () => {
     const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
     const all = [
-      ...index.deals.map((d) => ({ ...d, hay: `${d.name} ${d.set} ${d.kind} deal`.toLowerCase() })),
-      ...index.wants.map((w) => ({ ...w, hay: `${w.name} ${w.set} want`.toLowerCase() })),
+      ...index.deals.map((d) => ({
+        ...d,
+        hay: `${d.name} ${d.set} ${d.kind} deal`.toLowerCase(),
+      })),
+      ...index.wants.map((w) => ({
+        ...w,
+        hay: `${w.name} ${w.set} want`.toLowerCase(),
+      })),
     ];
-    hits = words.length ? all.filter((x) => words.every((w) => x.hay.includes(w))).slice(0, 40) : index.deals.slice(0, 12);
+    hits = words.length
+      ? all.filter((x) => words.every((w) => x.hay.includes(w))).slice(0, 40)
+      : index.deals.slice(0, 12);
     sel = 0;
     render();
   };
@@ -89,12 +111,18 @@
     search();
   };
 
-  document.querySelectorAll("[data-open-search]").forEach((b) => b.addEventListener("click", open));
+  document
+    .querySelectorAll("[data-open-search]")
+    .forEach((b) => b.addEventListener("click", open));
   document.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       open();
-    } else if (e.key === "/" && !dlg.open && !/^(input|textarea|select)$/i.test(e.target.tagName)) {
+    } else if (
+      e.key === "/" &&
+      !dlg.open &&
+      !/^(input|textarea|select)$/i.test(e.target.tagName)
+    ) {
       e.preventDefault();
       open();
     }

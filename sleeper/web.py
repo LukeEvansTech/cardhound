@@ -477,7 +477,9 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
                     "side": f"{d} deal{'s' if d != 1 else ''}, {n} live",
                 }
             )
-        deals = scored([dict(r) for r in db.all("SELECT * FROM listings WHERE active = 1 AND deal = 1")])
+        deals = scored(
+            [dict(r) for r in db.all("SELECT * FROM listings WHERE active = 1 AND deal = 1")]
+        )
         deals.sort(key=lambda r: (RATING_ORDER.get(r["v"].rating, 9), r["v"].total))
         deals_out = [
             {
