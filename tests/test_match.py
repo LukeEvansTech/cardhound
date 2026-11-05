@@ -140,3 +140,53 @@ def test_title_parallel_suffix_and_hyphenated_lists():
 
 def test_hyphenated_action_point_lists():
     assert match.card_numbers("AP03-AP04") == {"AP03", "AP04"}
+
+
+def test_single_print_wants_check_bare_numbers_and_stars():
+    w = {
+        "set": "FMA",
+        "who": "Edward Elric · 012 SR★★",
+        "match": "Edward Elric",
+        "cards": "UE09BT/FMA-1-012_p1 SR★★",
+    }
+    assert match.print_of(w) == ("012", "2")
+    assert match.print_of({"cards": "UEPR/FMA-1-039_p2 U"}) == ("039", "-")
+    assert match.print_of({"cards": "UE09BT/FMA-1-012_p1 SR★★, UE09BT/FMA-1-040_p1 SR★"}) is None
+
+    def keep(t):
+        return match.keep(w, "psa", t, t)
+
+    assert keep("Union Arena Edward Elric (012) 2 Star PSA 10")
+    assert keep("Union Arena Edward Elric 2 star psa 10 pop 1/250")  # a serial is not a card number
+    assert not keep("Union Arena Edward Elric #040 2 star psa 10")
+    assert not keep("Union Arena Edward Elric 1 star psa 10")
+    assert match.comp_id({"_id": 5, "family": 2}) == 2 and match.comp_id({"_id": 5}) == 5
+
+
+def test_print_of_needs_one_print_and_reads_unknown_rarity():
+    assert match.print_of({"cards": "UE15BT/EVA-1-082_p1 SR★, 081"}) is None  # another card too
+    assert match.print_of({"cards": "UE09BT/FMA-1-012_p1 SR★★, FMA-1-012_p2 SR★"}) is None
+    assert match.print_of({"cards": "UE22BT/CSM-1-056_p1"}) == ("056", None)
+    w = {"set": "CSM", "who": "Aki", "cards": "UE22BT/CSM-1-056_p1"}
+    title = "Union Arena Chainsaw Man Aki CSM-1-056 2 Star PSA 10"
+    assert match.keep(w, "psa", title, title)  # unknown rarity: any star count passes
+
+
+def test_stated_stars_ignores_generic_art_words():
+    assert match.stated_stars("Edward Elric FMA-1-012_p1 Parallel PSA 10") == "-"
+    assert match.stated_stars("Edward SR*** PSA 10") == "3"
+    assert match.stated_stars("Edward 1-star alt art") == "1"
+    assert match.stated_stars("Edward U* foil") == "1" and match.stated_stars("Edward R** x") == "2"
+    w = {
+        "set": "FMA",
+        "who": "Edward",
+        "match": "Edward Elric",
+        "cards": "UE09BT/FMA-1-012_p1 SR★★",
+    }
+    t = "Union Arena Edward Elric FMA-1-012_p1 Parallel PSA 10"
+    assert match.keep(w, "psa", t, t)
+
+
+def test_spaced_serial_is_not_a_card_number():
+    assert match.BARE_NO.findall("Union Arena Edward Elric 3 Star Serial #001 /250 PSA 10") == []
+    assert match.BARE_NO.findall("Union Arena Lanfan (023) SR*") == ["023"]

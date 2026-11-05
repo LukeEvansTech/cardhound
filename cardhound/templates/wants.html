@@ -20,17 +20,21 @@
 <div class="grid">
   {% for w in wants %}
   {% set c = counts.get(w._id, (0, 0)) %}
-  <a class="tile want-tile {{ '' if w._enabled else 'off' }}" href="/wants/{{ w._id }}">
+  <article class="tile want-tile {{ '' if w._enabled else 'off' }}">
     {% set t = thumbs.get(w._id) %}
     {% if t %}<img loading="lazy" src="/refs/{{ t.name }}" alt="">{% else %}<span class="noart">{{ w.set }}</span>{% endif %}
     <div class="tile-body">
-      <strong class="tile-name">{{ w.who }}</strong>
+      <strong class="tile-name"><a class="tile-link" href="/?want={{ w._id }}&amp;show=all">{{ w.who }}</a></strong>
       <span class="muted small">{{ w.set }}{% if t and t.total > 1 %} · {{ t.kept }} of {{ t.total }} arts{% endif %}{% if not w._enabled %} · paused{% endif %}</span>
       <span class="small">PSA {% for k, v in (w.max or {}).items() %}{{ k | star or k }} {{ v | money }} {% else %}<span class="muted">default</span>{% endfor %}</span>
       <span class="small">Raw {% if w.raw is sameas false %}<span class="muted">off</span>{% else %}{% for k, v in (w.rawmax or {}).items() %}{{ k | star or k }} {{ v | money }} {% endfor %}{% if w.raw_max %}{{ w.raw_max | money }}{% elif not w.rawmax %}<span class="muted">default</span>{% endif %}{% endif %}</span>
-      <span class="small">{{ c[0] }} live · <b>{{ c[1] or 0 }} deal{{ 's' if (c[1] or 0) != 1 }}</b></span>
+      <span class="small tile-actions">
+        <a href="/?want={{ w._id }}&amp;show=all">{{ c[0] }} live</a> ·
+        <a href="/?want={{ w._id }}&amp;show=deals"><b>{{ c[1] or 0 }} deal{{ 's' if (c[1] or 0) != 1 }}</b></a> ·
+        <a href="/wants/{{ w._id }}">Edit</a>
+      </span>
     </div>
-  </a>
+  </article>
   {% endfor %}
 </div>
 {% else %}
@@ -40,11 +44,11 @@
   {% set c = counts.get(w._id, (0, 0)) %}
   <tr class="{{ '' if w._enabled else 'off' }}">
     <td>{{ w.set }}</td>
-    <td><a href="/wants/{{ w._id }}">{{ w.who }}</a>{% if w.cards %} <span class="muted small">{{ w.cards }}</span>{% endif %}</td>
+    <td><a href="/?want={{ w._id }}&amp;show=all">{{ w.who }}</a> <a class="muted small" href="/wants/{{ w._id }}">edit</a>{% if w.cards %} <span class="muted small">{{ w.cards }}</span>{% endif %}</td>
     <td>{% for k, v in (w.max or {}).items() %}{{ k | star or k }} {{ v | money }} {% endfor %}</td>
     <td>{% if w.raw is sameas false %}off{% else %}{% for k, v in (w.rawmax or {}).items() %}{{ k | star }} {{ v | money }} {% endfor %}{% if w.raw_max %}{{ w.raw_max | money }}{% endif %}{% endif %}</td>
-    <td>{{ c[0] }}</td>
-    <td>{{ c[1] or 0 }}</td>
+    <td><a href="/?want={{ w._id }}&amp;show=all">{{ c[0] }}</a></td>
+    <td><a href="/?want={{ w._id }}&amp;show=deals">{{ c[1] or 0 }}</a></td>
     <td>{{ '' if w._enabled else 'paused' }}</td>
   </tr>
   {% endfor %}

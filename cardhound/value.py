@@ -122,7 +122,7 @@ def assess(
     ship = listing.get("ship")
     total = usd + (ship or 0)
     cap = listing.get("cap")
-    wid = w["_id"]
+    wid = int(w.get("family") or w["_id"])  # split prints share their card's comps
     ten, raw = cmp.get((wid, "psa", star)), cmp.get((wid, "raw", star))
     rate, rate_src = gem_rate(w, star, pop_rows, set_rates)
     reasons: list[str] = []

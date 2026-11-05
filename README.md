@@ -21,6 +21,11 @@ sweep (cron) ─▶ eBay search per want (Browse API or headless Chromium) ─�
   delivery). The Wants page shows each want as a card with its official art; on the page for one want you
   can untick arts you don't want, and listings whose photo matches only those stop counting as
   deals. 1★ defaults for cards with no ceiling of their own are set at the foot of the Wants page.
+- **One print per want**: a want whose `cards` is a single print (`UE09BT/FMA-1-012_p1 SR★★`) only
+  keeps listings whose title agrees with that print's number and star count. Prints split from one
+  card carry `family` (the card's want ID) and `match` (its name): they share one eBay search and
+  one set of sold comps, each listing goes to one print, and a deal whose photo matches a sibling's
+  art moves to that sibling. Clicking a want opens its live listings and deals.
 - **Deal**: under the ceiling and either `great`, `good` or `unknown` (no sold prices yet). A raw
   copy rated `fair` or `high` still counts when grading it costs under 85% of the PSA 10 sold
   median. Anything else under the ceiling is listed but not alerted.

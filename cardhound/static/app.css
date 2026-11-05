@@ -459,6 +459,37 @@ textarea {
   color: #fff;
 }
 
+.want-tile {
+  position: relative;
+}
+
+/* The name's link covers the whole tile; the count and edit links sit above it. */
+.want-tile .tile-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.want-tile .tile-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.want-tile .tile-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.want-head .actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.want-head .actions form {
+  margin: 0;
+}
+
 .want-tile.off {
   opacity: 0.55;
 }

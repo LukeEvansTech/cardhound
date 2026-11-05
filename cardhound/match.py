@@ -77,6 +77,35 @@ def card_numbers(cards: str) -> set[str]:
     return out
 
 
+# A card number written on its own in a title: "#023", "(023)", " 023 ". Only zero-led numbers, so a
+# grade, a pop count or a "/250" serial is never read as one.
+BARE_NO = re.compile(r"(?<![\w/.-])#?(0\d{2})(?![\w/])(?!\s*/)")  # "#001 /250" is a serial
+
+
+def print_of(w: dict) -> tuple[str, str | None] | None:
+    """(card number, star bucket) when the whole card list is one print, e.g. ("012", "2") for
+    "UE09BT/FMA-1-012_p1 SR★★". The bucket is "-" for a rarity with no stars (a promo's "UR") and
+    None when no rarity is written, so the star count is unknown and not checked."""
+    cards = w.get("cards") or ""
+    found = PRINT_ID.findall(cards)
+    if len(found) != 1:
+        return None
+    if len(re.findall(r"\b[A-Z]{2,4}-\d-(?:\d{3}|AP\d{2})", cards)) != 1:
+        return None  # "…012_p1 SR★★, FMA-1-012_p2 SR★" is two prints of one number
+    num = found[0][1].split("-")[-1].split("_")[0].upper()
+    if card_numbers(cards) != {num}:  # "…082_p1 SR★, 081" lists another card too
+        return None
+    m = re.search(PRINT_ID.pattern + r"\s+([A-Z]{1,3})(★*)(?=[\s,]|$)", cards)
+    if not m:
+        return num, None
+    return num, str(len(m.group(4))) if m.group(4) else "-"
+
+
+def comp_id(w: dict) -> int:
+    """The want id sold comps are kept under: a split print shares its family's comps."""
+    return int(w.get("family") or w["_id"])
+
+
 US_ZIP = "97035"  # the Oregon forwarding address: eBay prices shipping and eligibility for it
 
 
@@ -90,6 +119,20 @@ def stars(title: str) -> str:
         return "2"
     if re.search(r"1 ?star|alt(ernate)? ?art|parallel|★|☆|\*", t):
         return "1"
+    return "-"
+
+
+def stated_stars(title: str) -> str:
+    """The star count a title states outright ("2 star", "★★", "SR**"), else "-". Unlike stars(),
+    words like "parallel" or "alt art" say nothing about the tier, so they don't count here."""
+    t = re.sub(r"(\d)\s*-\s*star", r"\1 star", title.lower())
+    t = re.sub(r"\b([123])\s*[★☆]", r"\1 star", t)
+    for n in ("3", "2", "1"):
+        k = int(n)
+        if re.search(
+            rf"\b{n} ?stars?\b|(?<![★☆]){'[★☆]' * k}(?![★☆])|\b(?:ur|sr|r|u|c)\*{{{k}}}(?!\*)", t
+        ):
+            return n
     return "-"
 
 
@@ -135,6 +178,13 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
         listed = card_numbers(w["cards"])
         if seen and listed and not seen & listed:  # no readable numbers: no check
             return False
+        one = print_of(w)
+        if one:  # a single print: a bare number or a star count in the title must agree too
+            bare = set(BARE_NO.findall(title)) if not seen else set()
+            if bare and one[0] not in bare:
+                return False
+            if one[1] is not None and stated_stars(title) not in ("-", one[1]):
+                return False
     if FOREIGN.search(t) or FOREIGN_SELLER.search(text):
         return False
     if w.get("set") == "DBS" and re.search(r"signed|autograph|\bauto\b|sabat|schemmel|nadolny", t):

@@ -156,9 +156,15 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         )
 
     @app.get("/", response_class=HTMLResponse)
-    def home(request: Request, set: str = "", kind: str = "", show: str = "deals"):
+    def home(request: Request, set: str = "", kind: str = "", show: str = "deals", want: int = 0):
         sql = "SELECT * FROM listings WHERE active = 1"
         args: list = []
+        cur_want = db.want(want) if want else None
+        if want and not cur_want:
+            raise HTTPException(404, "want not found")
+        if cur_want:
+            sql += " AND want_id = ?"
+            args.append(want)
         if show == "deals":
             sql += " AND deal = 1"
         if kind in ("psa", "raw"):
@@ -167,7 +173,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         rows = scored([dict(r) for r in db.all(sql, *args)])
         if set:
             rows = [r for r in rows if r["want"].get("set") == set]
-        rows.sort(key=lambda r: (RATING_ORDER.get(r["v"].rating, 9), r["v"].total))
+        rows.sort(key=lambda r: (not r["deal"], RATING_ORDER.get(r["v"].rating, 9), r["v"].total))
         sets = sorted({w.get("set", "") for w in db.wants()})
         last = db.one("SELECT * FROM runs ORDER BY id DESC LIMIT 1")
         return page(
@@ -179,6 +185,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             cur_set=set,
             kind=kind,
             show=show,
+            cur_want=cur_want,
             last=last,
             running=sweep.LOCK.locked(),
         )
@@ -195,11 +202,11 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         w = r["want"]
         cmp, pop = sweep.context(db)
         card_comps = sorted(
-            [(k[1], k[2], c) for k, c in cmp.items() if k[0] == w["_id"]],
+            [(k[1], k[2], c) for k, c in cmp.items() if k[0] == match.comp_id(w)],
             key=lambda x: (x[0], x[1]),
         )
         recent = db.all(
-            "SELECT * FROM sold WHERE want_id = ? ORDER BY date DESC LIMIT 12", w["_id"]
+            "SELECT * FROM sold WHERE want_id = ? ORDER BY date DESC LIMIT 12", match.comp_id(w)
         )
         others = scored(
             [
@@ -366,22 +373,34 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         # An unticked checkbox is simply absent from the form.
         new_id = db.save_want(spec, want_id, enabled=form.get("enabled") == "on")
         # Its refs may have changed: photo verdicts are judged again on the next sweep.
-        db.run("UPDATE listings SET art = NULL WHERE want_id = ?", new_id)
         saved = db.want(new_id)
+        fam = match.comp_id(saved) if saved else new_id
+        family = [x["_id"] for x in db.wants() if match.comp_id(x) == fam]
+        for fid in family or [new_id]:  # a sibling's photo may now belong to this print, or not
+            db.run("UPDATE listings SET art = NULL WHERE want_id = ?", fid)
         if saved:
             sweep.retire_unsearched(db, saved)
         return RedirectResponse(f"/wants/{new_id}", status_code=303)
 
     @app.post("/wants/{want_id}/delete")
     def want_delete(want_id: int):
+        gone = db.want(want_id)
+        rest = [x for x in db.wants() if x["_id"] != want_id]
+        # sold comps live under the card's family id; drop them once no remaining print uses them
+        orphans = {
+            cid
+            for cid in (want_id, match.comp_id(gone) if gone else want_id)
+            if not any(match.comp_id(x) == cid for x in rest)
+        }
         with db.tx() as c:
             c.execute(
                 "DELETE FROM alerts WHERE item_id IN (SELECT item_id FROM listings WHERE want_id = ?)",
                 (want_id,),
             )
             c.execute("DELETE FROM listings WHERE want_id = ?", (want_id,))
-            c.execute("DELETE FROM sold WHERE want_id = ?", (want_id,))
             c.execute("DELETE FROM wants WHERE id = ?", (want_id,))
+            for cid in orphans:
+                c.execute("DELETE FROM sold WHERE want_id = ?", (cid,))
         return RedirectResponse("/wants", status_code=303)
 
     @app.post("/wants/{want_id}/sweep")

@@ -12,7 +12,7 @@ import json
 import logging
 import re
 import threading
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 from . import match, notify, photos, value
 from .config import Settings
@@ -45,16 +45,34 @@ def _sold_date(text: str, today: str) -> str:
     return dt.datetime.strptime(m.group(1), "%b %d, %Y").date().isoformat()
 
 
-def collect(b: Source, w: dict, blocked: set[str], defaults: dict, today: str, sold_too: bool):
-    """(listings, sold, ok_kinds, failed_kinds) for one want."""
+def collect(
+    b: Source,
+    w: dict,
+    blocked: set[str],
+    defaults: dict,
+    today: str,
+    sold_too: bool,
+    cache: dict | None = None,
+):
+    """(listings, sold, ok_kinds, failed_kinds) for one want.
+
+    ``cache`` holds this sweep's search results by URL: the prints split from one card share a query,
+    so eBay is asked once and each print filters the same rows."""
     found, sold, ok, failed = [], [], [], []
+    cache = {} if cache is None else cache
+
+    def fetch(url: str) -> list[dict] | None:
+        if url not in cache:
+            cache[url] = b.search(url)
+        return cache[url]
+
     for kind, q in match.searches(w):
-        rows = b.search(match.search_url(q))
+        rows = fetch(match.search_url(q))
         if rows is None:
             failed.append(kind)
             continue
         ok.append(kind)
-        for r in (b.search(match.search_url(q, sold=True)) if sold_too else None) or []:
+        for r in (fetch(match.search_url(q, sold=True)) if sold_too else None) or []:
             if r["id"] in blocked or not match.keep(w, kind, r["title"], r["text"]):
                 continue
             if match.money(r["price"]) <= 0:
@@ -62,7 +80,7 @@ def collect(b: Source, w: dict, blocked: set[str], defaults: dict, today: str, s
             sold.append(
                 {
                     "item_id": r["id"],
-                    "want_id": w["_id"],
+                    "want_id": match.comp_id(w),
                     "kind": kind,
                     "star": match.stars(r["title"]),
                     "usd": match.money(r["price"]),
@@ -73,7 +91,7 @@ def collect(b: Source, w: dict, blocked: set[str], defaults: dict, today: str, s
         for r in rows:
             if r["id"] in blocked or not match.keep(w, kind, r["title"], r["text"]):
                 continue
-            star = match.stars(r["title"])
+            star = match.stars(r["title"])  # never the print's own: 1★ and 2★ share their art
             usd = match.money(r["price"])
             if usd <= 0:  # price element missing or unparsed: never a $0 deal
                 continue
@@ -102,12 +120,60 @@ def collect(b: Source, w: dict, blocked: set[str], defaults: dict, today: str, s
     return found, sold, ok, failed
 
 
+def fit(f: dict, w: dict, matched: int | None) -> tuple:
+    """Sort key for the print a listing belongs to, best first.
+
+    A photo already matched to a print wins; then a title naming the print's number, then its star
+    count; then the lowest ceiling, so a listing the title and photo can't place never becomes a deal
+    on the strength of a sibling's higher ceiling."""
+    one = match.print_of(w)
+    title = f["title"]
+    named = starred = False
+    if one:
+        num, star = one
+        named = num in {n.upper() for n in match.TITLE_NO.findall(title)} or num in set(
+            match.BARE_NO.findall(title)
+        )
+        starred = match.stated_stars(title) == star != "-"
+    cap = f["cap"] if f["cap"] is not None else -1.0
+    return (w["_id"] != matched, not named, not starred, cap, w["_id"])
+
+
+def assign(db: DB, found: list[dict], wants: dict[int, dict]) -> dict[tuple[str, str], dict]:
+    """One want per listing: the prints split from one card can all claim the same listing."""
+    cands: dict[tuple[str, str], list[dict]] = {}
+    for f in found:
+        cands.setdefault((f["item_id"], f["kind"]), []).append(f)
+    matched = {}
+    for r in db.all("SELECT item_id, kind, want_id, art FROM listings WHERE art IS NOT NULL"):
+        if json.loads(r["art"]).get("verdict") == "match":
+            matched[(r["item_id"], r["kind"])] = r["want_id"]
+    live = {x["_id"]: x for x in db.wants()}
+    out = {}
+    for key, fs in cands.items():
+        fs = [f for f in fs if f["want_id"] in wants] or fs
+        m = matched.get(key)
+        if (
+            m is not None
+            and m in live
+            and m not in wants
+            and match.keep(live[m], fs[0]["kind"], fs[0]["title"], fs[0]["title"])
+        ):
+            continue  # its photo placed it on a print this sweep didn't search; leave it there
+        ranked = sorted(
+            (fit(f, wants.get(f["want_id"], {"_id": f["want_id"]}), m), i) for i, f in enumerate(fs)
+        )
+        out[key] = fs[ranked[0][1]]
+    return out
+
+
 def store(db: DB, run_id: int, found: list[dict], sold: list[dict], searched: list[tuple]) -> None:
     now = dt.datetime.now().isoformat(timespec="seconds")
-    live = {w["_id"] for w in db.wants()}  # a want deleted mid-sweep must not come back
+    wants = db.wants()
+    live = {w["_id"] for w in wants}  # a want deleted mid-sweep must not come back
     blocked = db.blocked()  # nor a listing blocked mid-sweep
     found = [f for f in found if f["want_id"] in live and f["item_id"] not in blocked]
-    sold = [x for x in sold if x["want_id"] in live]
+    sold = [x for x in sold if x["want_id"] in live | {match.comp_id(w) for w in wants}]
     searched = [x for x in searched if x[0] in live]
     with db.tx() as c:
         for s in sold:
@@ -153,11 +219,13 @@ def retire_unsearched(db: DB, w: dict) -> None:
 def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], run_id: int) -> None:
     """Score each live deal's photo against the official art, once per listing."""
     rows = db.all(
-        "SELECT item_id, kind, want_id, img, art FROM listings WHERE active = 1 AND deal = 1 "
+        "SELECT item_id, kind, want_id, img, art, star, usd, ship, title FROM listings "
+        "WHERE active = 1 AND deal = 1 "
         "AND last_run = ?",
         run_id,
     )
     pages = ITEM_PAGES_PER_RUN
+    everyone = {x["_id"]: x for x in db.wants(enabled_only=True)}  # siblings outside this sweep too
     for r in rows:
         w = wants.get(r["want_id"])
         old = json.loads(r["art"]) if r["art"] else {}
@@ -168,7 +236,7 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             for p in photos.refs_for(w, s.refs_dir)
             if p.name not in (w.get("skip") or [])
         )
-        refs_now = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+        refs_now = cache_key(s, w, everyone)
         moved = old.get("verdict") not in (None, "unchecked") and old.get("refs") != refs_now
         if (
             old
@@ -178,6 +246,7 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
         ):
             continue
         res = photos.check(w, r["item_id"], r["img"], s.refs_dir, s.photos_dir)
+        shots = [res["photo"]] if res.get("photo") else []
         if res["verdict"] in ("differs", "unclear", "unwanted"):
             srcs = []
             if b is not None and pages > 0:
@@ -187,6 +256,8 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             for i, src in enumerate(srcs):
                 alt = photos.check(w, f"{r['item_id']}_{i}", src, s.refs_dir, s.photos_dir)
                 complete = complete and alt["verdict"] != "unchecked"
+                if alt.get("photo"):
+                    shots.append(alt["photo"])
                 if alt["verdict"] == "match":  # a kept art matching beats any other score
                     res = alt
                     break
@@ -194,12 +265,78 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
                     res = alt
             # Until one of the listing's own photos was scored, the thumbnail verdict is provisional.
             res["retry"] = not complete and res["verdict"] != "match"
+        res["refs"] = refs_now
+        if res["verdict"] != "match" and move_to_sibling(db, s, r, w, everyone, shots):
+            continue
         db.run(
             "UPDATE listings SET art = ? WHERE item_id = ? AND kind = ?",
             json.dumps(res),
             r["item_id"],
             r["kind"],
         )
+
+
+def cache_key(s: Settings, w: dict, wants: dict[int, dict]) -> list[str]:
+    """What a photo verdict was judged against: the art and skips of this want and of each sibling print,
+    since a listing that misses its own print may belong to a sibling."""
+    key = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+    for sid in sorted(siblings(w, wants)):
+        sib = wants[sid]
+        key += [f"sib:{sid}:{x}" for x in photos.ref_key(sib, photos.refs_for(sib, s.refs_dir))]
+        key.append(f"sib:{sid}:raw={sib.get('raw', True) is not False}")
+    return key
+
+
+def siblings(w: dict, wants: dict[int, dict]) -> list[int]:
+    """Other prints split from the same card (the card's own want included, if it still exists)."""
+    fam = match.comp_id(w)
+    return [x["_id"] for x in wants.values() if x["_id"] != w["_id"] and match.comp_id(x) == fam]
+
+
+def move_to_sibling(
+    db: DB, s: Settings, r: Any, w: dict, wants: dict[int, dict], shots: list[str]
+) -> bool:
+    """A photo that is another print of the same card moves the listing to that print's want."""
+    family = match.comp_id(w)
+    sibs = [
+        x
+        for x in wants.values()
+        if x["_id"] != w["_id"]
+        and match.comp_id(x) == family
+        and r["kind"] in {k for k, _ in match.searches(x)}  # never into a print with raw off
+        and match.keep(x, r["kind"], r["title"], r["title"])  # star tier and number must agree
+    ]
+    if not sibs or not w.get("family") and not any(x.get("family") for x in sibs):
+        return False
+    for sib in sibs:
+        # every photo already downloaded for this listing; "file:" means use the cached copy
+        got = next(
+            (
+                g
+                for g in (
+                    photos.check(sib, shot.rsplit(".", 1)[0], "file:", s.refs_dir, s.photos_dir)
+                    for shot in shots
+                )
+                if g["verdict"] == "match"
+            ),
+            None,
+        )
+        if got is None:
+            continue
+        got["refs"] = cache_key(s, sib, wants)  # the key photo_check compares next sweep
+        cap = match.ceiling(sib, r["kind"], r["star"], db.defaults())
+        deal = int(cap is not None and r["usd"] + (r["ship"] or 0) <= cap)
+        db.run(
+            "UPDATE listings SET want_id = ?, cap = ?, deal = ?, art = ? WHERE item_id = ? AND kind = ?",
+            sib["_id"],
+            cap,
+            deal,
+            json.dumps(got),
+            r["item_id"],
+            r["kind"],
+        )
+        return True
+    return False
 
 
 def rate(db: DB, s: Settings, run_id: int, wants: dict[int, dict]) -> int:
@@ -384,7 +521,11 @@ def load_export(db: DB, body: dict) -> dict:
 
 def import_sold(db: DB, sold: dict) -> int:
     """Sales from a signed-in browser: {item_id: {set, who, kind, star, usd, date, title}}."""
-    ids = {(w.get("set"), w["who"]): w["_id"] for w in db.wants()}
+    ids = {}
+    for w in db.wants():  # a split print is pushed under its card's name; comps go to the family
+        ids[(w.get("set"), w["who"])] = match.comp_id(w)
+        if w.get("family") and w.get("match"):
+            ids.setdefault((w.get("set"), w["match"]), match.comp_id(w))
     rows = []
     for item_id, x in sold.items():
         want_id = ids.get((x.get("set"), x.get("who")))
@@ -459,18 +600,17 @@ def run(
         found, sold, searched, failed = [], [], [], []
         n = 0
         say(f"source: {'eBay Browse API' if s.ebay_api and not browser else 'browser'}")
+        cache: dict = {}
         with (browser or (lambda: default_source(s)))() as b:
             for i, w in enumerate(wants, 1):
-                f, so, ok, bad = collect(b, w, blocked, defaults, today, s.ebay_sold)
+                f, so, ok, bad = collect(b, w, blocked, defaults, today, s.ebay_sold, cache)
                 n += len(ok) + len(bad)
                 found += f
                 sold += so
                 searched += [(w["_id"], k) for k in ok]
                 failed += [f"{w['who']} ({k})" for k in bad]
                 say(f"[{i}/{len(wants)}] {w['who']}: {len(f)} listings, {len(so)} sold")
-            uniq: dict[tuple[str, str], dict] = {}
-            for f in found:
-                uniq.setdefault((f["item_id"], f["kind"]), f)
+            uniq = assign(db, found, by_id)
             store(db, run_id, list(uniq.values()), sold, searched)
             for w in wants:
                 retire_unsearched(db, w)
@@ -478,6 +618,9 @@ def run(
             say(f"price check: {demoted} under the ceiling but not below recent sales")
             say("photo check")
             photo_check(db, s, b, by_id, run_id)
+            # a deal can move to a sibling print outside a filtered sweep: rate and alert it too
+            by_id = {x["_id"]: x for x in db.wants(enabled_only=True)} | by_id
+            rate(db, s, run_id, by_id)  # a listing moved to a sibling print is rated as that print
             db.run(  # a photo of art Luke has unticked on the want is not a deal either
                 "UPDATE listings SET deal = 0 WHERE last_run = ? AND deal = 1 "
                 "AND json_extract(art, '$.verdict') = 'unwanted'",
