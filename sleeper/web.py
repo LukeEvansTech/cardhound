@@ -165,6 +165,12 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
                     )
                 lines.append("")
         lines.append(f"{g['live']} deals live. All deals: {s.link('/')}")
+        if g["runs"] == 0:
+            lines.append("No sweeps ran since the last summary.")
+        elif g["bad_runs"]:
+            lines.append(f"{g['bad_runs']} of {g['runs']} sweeps had a problem: {s.link('/ops')}")
+        if g["failed_searches"]:
+            lines.append(f"{g['failed_searches']} of {g['searches']:,} searches failed.")
         return html, "\n".join(lines)
 
     if start_scheduler:

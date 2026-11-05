@@ -189,3 +189,12 @@ def test_summary_needs_an_absolute_public_url(monkeypatch):
     assert config.load().summary_on
     monkeypatch.setenv("SLEEPER_PUBLIC_URL", "")
     assert not config.load().summary_on
+
+
+def test_plain_text_carries_sweep_health(env):
+    s, db, client = env
+    baseline(db, s, [row("1", 700)])
+    db.run("INSERT INTO runs (status, alerts) VALUES ('success', 'failed: TimeoutError')")
+    client.post("/summary/send")
+    text = FakeSMTP.sent[-1].get_body(("plain",)).get_content()
+    assert "1 of 1 sweeps had a problem" in text

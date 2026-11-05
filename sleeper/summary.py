@@ -174,7 +174,13 @@ def send(s: Settings, g: dict, render) -> str:
 def run(db: DB, s: Settings, render) -> str:
     """Gather, send, and move the start point on only when the email went."""
     with LOCK:
-        g = gather(db, s)
+        # wait out a running sweep: its listings are provisional until its checks finish
+        if not sweep.LOCK.acquire(timeout=3600):  # pylint: disable=consider-using-with
+            return "failed: a sweep ran for over an hour"
+        try:
+            g = gather(db, s)
+        finally:
+            sweep.LOCK.release()
         res = send(s, g, render)
         if res == "sent":
             db.put(LAST_RUN, g["last_run"])
