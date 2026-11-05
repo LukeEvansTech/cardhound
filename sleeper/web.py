@@ -62,17 +62,11 @@ def buy_links(w: dict) -> list[tuple[str, str]]:
     ]
 
 
-LEFT = re.compile(r"(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*left")
-
-
 def ends_at(r: dict) -> float:
-    """Auction end as a timestamp: the sweep's time left counted from when it was seen."""
-    m = LEFT.search(r.get("time_left") or "")
-    if not r.get("auction") or not m or not any(m.groups()):
+    """Auction end as a timestamp; listings without one (not auctions, or not seen since) go last."""
+    if not r.get("auction") or not r.get("ends"):
         return float("inf")
-    d, h, mins = (int(x or 0) for x in m.groups())
-    seen = dt.datetime.fromisoformat(r["last_seen"])
-    return (seen + dt.timedelta(days=d, hours=h, minutes=mins)).timestamp()
+    return dt.datetime.fromisoformat(r["ends"]).timestamp()
 
 
 BUY_FILTERS: dict[str, Callable[[dict], bool]] = {

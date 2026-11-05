@@ -630,17 +630,17 @@ def test_deals_filter_by_graded_raw_format_and_sort(env):
     )
     wid = db.wants()[0]["_id"]
 
-    def add(item_id, kind, usd, auction=0, left="", obo=0, seen="2026-11-05T12:00:00"):
+    def add(item_id, kind, usd, auction=0, ends=None, obo=0, seen="2026-11-05T12:00:00"):
         with db.tx() as c:
             c.execute(
-                "INSERT INTO listings (item_id, kind, want_id, title, usd, star, auction, time_left, obo, "
+                "INSERT INTO listings (item_id, kind, want_id, title, usd, star, auction, ends, obo, "
                 "deal, first_seen, last_seen) VALUES (?, ?, ?, 'Vegito', ?, '-', ?, ?, ?, 1, ?, ?)",
-                (item_id, kind, wid, usd, auction, left, obo, seen, "2026-11-05T12:00:00"),
+                (item_id, kind, wid, usd, auction, ends, obo, seen, "2026-11-05T12:00:00"),
             )
 
-    add("g1", "psa", 900, auction=1, left="2d 1h left")
+    add("g1", "psa", 900, auction=1, ends="2026-11-07T13:00")
     add("g2", "psa", 800, obo=1, seen="2026-11-05T13:00:00")
-    add("r1", "raw", 50, auction=1, left="35m left")
+    add("r1", "raw", 50, auction=1, ends="2026-11-05T12:35")
 
     def ids(qs):
         page = client.get("/" + qs).text
@@ -664,3 +664,28 @@ def test_deals_filter_by_graded_raw_format_and_sort(env):
     assert order("?show=all&sort=ending")[:2] == ["r1", "g1"]  # auctions soonest first
     assert order("?show=all&sort=new")[0] == "g2"
     assert client.get("/?show=all&sort=bogus&buy=bogus&kind=bogus").status_code == 200
+
+
+def test_sweep_stores_when_each_auction_ends(env, monkeypatch):
+    s, db, client = env
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    client.post(
+        "/api/import",
+        json={
+            "wants": [{"set": "DBS", "who": "Vegito", "q": "vegito psa 10", "max": {"any": 1150}}]
+        },
+    )
+    short = {
+        **ROW,
+        "id": "333",
+        "text": "PSA 10 Vegito BT7-118 SPR $700.00 +$5.64 delivery 2 bids 35m left",
+    }
+    before = dt.datetime.now()
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW, short]))
+    got = {r["item_id"]: r for r in db.all("SELECT item_id, time_left, ends FROM listings")}
+    assert got["333"]["time_left"] == "35m left"
+    end = dt.datetime.fromisoformat(got["333"]["ends"])
+    assert dt.timedelta(minutes=33) < end - before < dt.timedelta(minutes=37)
+    assert got["111"]["time_left"] == "1d 2h left"
+    page = client.get("/?show=all&sort=ending").text
+    assert page.index("/deal/333/") < page.index("/deal/111/")

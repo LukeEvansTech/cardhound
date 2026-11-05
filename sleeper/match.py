@@ -20,6 +20,7 @@ A want is a dict (stored as JSON in the wants table). Keys, all optional except 
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 import urllib.parse
 
@@ -225,3 +226,15 @@ def ceiling(w: dict, kind: str, star: str, defaults: dict) -> float | None:
     if "any" in mx:
         return float(mx["any"])
     return float(defaults["psa_1star_max"]) if star == "1" else None
+
+
+LEFT = re.compile(r"\b((?:\d+[dhm] )*\d+[dhm]) left\b")
+
+
+def left_of(text: str) -> tuple[str, dt.timedelta | None]:
+    """An auction's countdown as shown ("1d 4h left", "35m left") and as a duration."""
+    m = LEFT.search(text)
+    if not m:
+        return "", None
+    n = {u: int(v) for v, u in re.findall(r"(\d+)([dhm])", m.group(1))}
+    return m.group(0), dt.timedelta(days=n.get("d", 0), hours=n.get("h", 0), minutes=n.get("m", 0))
