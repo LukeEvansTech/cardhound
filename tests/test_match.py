@@ -169,3 +169,17 @@ def test_print_of_needs_one_print_and_reads_unknown_rarity():
     w = {"set": "CSM", "who": "Aki", "cards": "UE22BT/CSM-1-056_p1"}
     title = "Union Arena Chainsaw Man Aki CSM-1-056 2 Star PSA 10"
     assert match.keep(w, "psa", title, title)  # unknown rarity: any star count passes
+
+
+def test_stated_stars_ignores_generic_art_words():
+    assert match.stated_stars("Edward Elric FMA-1-012_p1 Parallel PSA 10") == "-"
+    assert match.stated_stars("Edward SR*** PSA 10") == "3"
+    assert match.stated_stars("Edward 1-star alt art") == "1"
+    w = {
+        "set": "FMA",
+        "who": "Edward",
+        "match": "Edward Elric",
+        "cards": "UE09BT/FMA-1-012_p1 SR★★",
+    }
+    t = "Union Arena Edward Elric FMA-1-012_p1 Parallel PSA 10"
+    assert match.keep(w, "psa", t, t)

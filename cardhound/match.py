@@ -120,6 +120,18 @@ def stars(title: str) -> str:
     return "-"
 
 
+def stated_stars(title: str) -> str:
+    """The star count a title states outright ("2 star", "★★", "SR**"), else "-". Unlike stars(),
+    words like "parallel" or "alt art" say nothing about the tier, so they don't count here."""
+    t = re.sub(r"(\d)\s*-\s*star", r"\1 star", title.lower())
+    t = re.sub(r"\b([123])\s*[★☆]", r"\1 star", t)
+    for n in ("3", "2", "1"):
+        k = int(n)
+        if re.search(rf"\b{n} ?stars?\b|(?<![★☆]){'[★☆]' * k}(?![★☆])|sr\*{{{k}}}(?!\*)", t):
+            return n
+    return "-"
+
+
 def searches(w: dict) -> list[tuple[str, str]]:
     """(kind, query) pairs for one want; kind is psa or raw."""
     if "q" in w:
@@ -167,7 +179,7 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
             bare = set(BARE_NO.findall(title)) if not seen else set()
             if bare and one[0] not in bare:
                 return False
-            if one[1] is not None and stars(title) not in ("-", one[1]):
+            if one[1] is not None and stated_stars(title) not in ("-", one[1]):
                 return False
     if FOREIGN.search(t) or FOREIGN_SELLER.search(text):
         return False

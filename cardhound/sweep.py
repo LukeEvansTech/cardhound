@@ -134,7 +134,7 @@ def fit(f: dict, w: dict, matched: int | None) -> tuple:
         named = num in {n.upper() for n in match.TITLE_NO.findall(title)} or num in set(
             match.BARE_NO.findall(title)
         )
-        starred = match.stars(title) == star != "-"
+        starred = match.stated_stars(title) == star != "-"
     cap = f["cap"] if f["cap"] is not None else -1.0
     return (w["_id"] != matched, not named, not starred, cap, w["_id"])
 
@@ -231,9 +231,7 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             for p in photos.refs_for(w, s.refs_dir)
             if p.name not in (w.get("skip") or [])
         )
-        refs_now = photos.ref_key(w, photos.refs_for(w, s.refs_dir)) + [
-            f"sib:{x}" for x in sorted(siblings(w, everyone))  # a new sibling print: judge again
-        ]
+        refs_now = cache_key(s, w, everyone)
         moved = old.get("verdict") not in (None, "unchecked") and old.get("refs") != refs_now
         if (
             old
@@ -271,6 +269,16 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             r["item_id"],
             r["kind"],
         )
+
+
+def cache_key(s: Settings, w: dict, wants: dict[int, dict]) -> list[str]:
+    """What a photo verdict was judged against: the want's art and skips, and each sibling print's,
+    since a listing that misses its own print may belong to a sibling."""
+    key = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+    for sid in sorted(siblings(w, wants)):
+        sib = wants[sid]
+        key += [f"sib:{sid}:{x}" for x in photos.ref_key(sib, photos.refs_for(sib, s.refs_dir))]
+    return key
 
 
 def siblings(w: dict, wants: dict[int, dict]) -> list[int]:
@@ -311,6 +319,7 @@ def move_to_sibling(
         )
         if got is None:
             continue
+        got["refs"] = cache_key(s, sib, wants)  # the key photo_check compares next sweep
         cap = match.ceiling(sib, r["kind"], r["star"], db.defaults())
         deal = int(cap is not None and r["usd"] + (r["ship"] or 0) <= cap)
         db.run(
