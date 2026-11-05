@@ -309,7 +309,7 @@ button,
   font-size: 0.92rem;
 }
 
-.toggle a:hover {
+.toggle a:where(:hover) {
   color: var(--ink);
 }
 
@@ -328,6 +328,10 @@ button,
 }
 
 .tile {
+  transition:
+    transform 180ms var(--m-ease),
+    border-color var(--m-out) var(--m-ease),
+    box-shadow 180ms var(--m-ease);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -755,7 +759,7 @@ tr.off td {
   gap: 6px;
 }
 
-.want-form .mini input {
+.want-form :where(.mini) input {
   width: 6.5rem;
 }
 
@@ -814,7 +818,7 @@ textarea {
   transition: background-size var(--m-out) var(--m-ease);
 }
 
-.want-tile .tile-actions a:hover {
+.want-tile .tile-actions a:where(:hover) {
   background-size: 100% 1px;
   background-position: left bottom;
   transition-duration: var(--m-in);
@@ -918,7 +922,7 @@ textarea {
   border-radius: var(--radius-sm);
 }
 
-.art:has(input:not(:checked)) img {
+.art:where(:has(input:not(:checked))) img {
   border-color: var(--line);
   filter: grayscale(1);
   opacity: 0.45;
@@ -1013,13 +1017,6 @@ textarea {
 }
 
 /* --- tile motion: lift, border and art zoom --- */
-
-.tile {
-  transition:
-    transform 180ms var(--m-ease),
-    border-color var(--m-out) var(--m-ease),
-    box-shadow 180ms var(--m-ease);
-}
 
 .tile:hover {
   transform: translateY(-2px);
