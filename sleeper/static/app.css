@@ -905,7 +905,7 @@ textarea {
   cursor: pointer;
 }
 
-.art-pick .art input {
+.art-pick :where(.art) input {
   position: absolute;
   top: 6px;
   left: 6px;
@@ -1026,6 +1026,13 @@ textarea {
     0 12px 24px -12px color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
+.tile img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+}
+
 .tile .well img {
   transition: transform 600ms var(--m-ease);
 }
@@ -1047,13 +1054,6 @@ textarea {
   place-items: center;
   padding: 10px 10px 0;
   background: var(--well);
-}
-
-.tile img {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 3 / 4;
-  object-fit: contain;
 }
 
 /* --- header --- */
