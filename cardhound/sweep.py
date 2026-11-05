@@ -153,7 +153,7 @@ def assign(db: DB, found: list[dict], wants: dict[int, dict]) -> dict[tuple[str,
     for key, fs in cands.items():
         fs = [f for f in fs if f["want_id"] in wants] or fs
         m = matched.get(key)
-        if m is not None and m in live and m not in {f["want_id"] for f in fs}:
+        if m is not None and m in live and m not in wants:
             continue  # its photo placed it on a print this sweep didn't search; leave it there
         ranked = sorted(
             (fit(f, wants.get(f["want_id"], {"_id": f["want_id"]}), m), i) for i, f in enumerate(fs)
@@ -585,6 +585,8 @@ def run(
             say(f"price check: {demoted} under the ceiling but not below recent sales")
             say("photo check")
             photo_check(db, s, b, by_id, run_id)
+            # a deal can move to a sibling print outside a filtered sweep: rate and alert it too
+            by_id = {x["_id"]: x for x in db.wants(enabled_only=True)} | by_id
             rate(db, s, run_id, by_id)  # a listing moved to a sibling print is rated as that print
             db.run(  # a photo of art Luke has unticked on the want is not a deal either
                 "UPDATE listings SET deal = 0 WHERE last_run = ? AND deal = 1 "
