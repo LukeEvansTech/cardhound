@@ -618,3 +618,74 @@ def test_a_cardhound_database_is_carried_over(tmp_path, monkeypatch):
     s = config.load()
     assert s.db_path.read_bytes() == b"x" * 10
     assert not (tmp_path / "cardhound.db").exists()
+
+
+def test_deals_filter_by_graded_raw_format_and_sort(env):
+    _, db, client = env
+    client.post(
+        "/api/import",
+        json={
+            "wants": [{"set": "DBS", "who": "Vegito", "q": "vegito psa 10", "max": {"any": 1150}}]
+        },
+    )
+    wid = db.wants()[0]["_id"]
+
+    def add(item_id, kind, usd, auction=0, ends=None, obo=0, seen="2026-11-05T12:00:00"):
+        with db.tx() as c:
+            c.execute(
+                "INSERT INTO listings (item_id, kind, want_id, title, usd, star, auction, ends, obo, "
+                "deal, first_seen, last_seen) VALUES (?, ?, ?, 'Vegito', ?, '-', ?, ?, ?, 1, ?, ?)",
+                (item_id, kind, wid, usd, auction, ends, obo, seen, "2026-11-05T12:00:00"),
+            )
+
+    add("g1", "psa", 900, auction=1, ends="2026-11-07T13:00")
+    add("g2", "psa", 800, obo=1, seen="2026-11-05T13:00:00")
+    add("r1", "raw", 50, auction=1, ends="2026-11-05T12:35")
+
+    def ids(qs):
+        page = client.get("/" + qs).text
+        return [x for x in ("g1", "g2", "r1") if f"/deal/{x}/" in page], page
+
+    got, page = ids("?show=all")
+    assert sorted(got) == ["g1", "g2", "r1"]
+    assert 'Graded <span class="n">2</span>' in page and 'Raw <span class="n">1</span>' in page
+    assert ids("?show=all&kind=psa")[0] == ["g1", "g2"]
+    assert ids("?show=all&kind=raw")[0] == ["r1"]
+    assert ids("?show=all&buy=auction")[0] == ["g1", "r1"]
+    assert ids("?show=all&buy=offers")[0] == ["g2"]
+    # counts follow the other filter: two auctions, one of them raw
+    assert 'Raw <span class="n">1</span>' in ids("?show=all&buy=auction")[1]
+
+    def order(qs):
+        page = client.get("/" + qs).text
+        return sorted(("g1", "g2", "r1"), key=lambda x: page.index(f"/deal/{x}/"))
+
+    assert order("?show=all&sort=price") == ["r1", "g2", "g1"]
+    assert order("?show=all&sort=ending")[:2] == ["r1", "g1"]  # auctions soonest first
+    assert order("?show=all&sort=new")[0] == "g2"
+    assert client.get("/?show=all&sort=bogus&buy=bogus&kind=bogus").status_code == 200
+
+
+def test_sweep_stores_when_each_auction_ends(env, monkeypatch):
+    s, db, client = env
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    client.post(
+        "/api/import",
+        json={
+            "wants": [{"set": "DBS", "who": "Vegito", "q": "vegito psa 10", "max": {"any": 1150}}]
+        },
+    )
+    short = {
+        **ROW,
+        "id": "333",
+        "text": "PSA 10 Vegito BT7-118 SPR $700.00 +$5.64 delivery 2 bids 35m left",
+    }
+    before = dt.datetime.now()
+    sweep.run(db, s, browser=lambda: FakeBrowser([ROW, short]))
+    got = {r["item_id"]: r for r in db.all("SELECT item_id, time_left, ends FROM listings")}
+    assert got["333"]["time_left"] == "35m left"
+    end = dt.datetime.fromisoformat(got["333"]["ends"])
+    assert dt.timedelta(minutes=33) < end - before < dt.timedelta(minutes=37)
+    assert got["111"]["time_left"] == "1d 2h left"
+    page = client.get("/?show=all&sort=ending").text
+    assert page.index("/deal/333/") < page.index("/deal/111/")

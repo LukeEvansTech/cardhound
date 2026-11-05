@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% macro qs(show_=show, kind_=kind, set_=cur_set) -%}
-?show={{ show_ }}{% if kind_ %}&amp;kind={{ kind_ }}{% endif %}{% if set_ %}&amp;set={{ set_ | urlencode }}{% endif %}{% if cur_want %}&amp;want={{ cur_want._id }}{% endif %}
+{% macro qs(show_=show, kind_=kind, set_=cur_set, buy_=buy, sort_=sort) -%}
+?show={{ show_ }}{% if kind_ %}&amp;kind={{ kind_ }}{% endif %}{% if buy_ %}&amp;buy={{ buy_ }}{% endif %}{% if sort_ != 'deal' %}&amp;sort={{ sort_ }}{% endif %}{% if set_ %}&amp;set={{ set_ | urlencode }}{% endif %}{% if cur_want %}&amp;want={{ cur_want._id }}{% endif %}
 {%- endmacro %}
 {% block title %}{{ cur_want.who if cur_want else ('Deals' if show == 'deals' else 'Live listings') }} · sleeper{% endblock %}
 {% block body %}
@@ -30,10 +30,15 @@
     <a href="{{ qs(show_='deals') }}" class="{{ 'on' if show == 'deals' }}">Deals</a>
     <a href="{{ qs(show_='all') }}" class="{{ 'on' if show == 'all' }}">All live</a>
   </span>
-  <span class="toggle">
-    <a href="{{ qs(kind_='') }}" class="{{ 'on' if not kind }}">PSA 10 and raw</a>
-    <a href="{{ qs(kind_='psa') }}" class="{{ 'on' if kind == 'psa' }}">PSA 10</a>
-    <a href="{{ qs(kind_='raw') }}" class="{{ 'on' if kind == 'raw' }}">Raw</a>
+  <span class="toggle" role="group" aria-label="Graded or raw">
+    {% for k, label in [('', 'All'), ('psa', 'Graded'), ('raw', 'Raw')] %}<a href="{{ qs(kind_=k) }}" class="{{ 'on' if kind == k }}"{{ ' aria-current="true"' | safe if kind == k }}>{{ label }} <span class="n">{{ counts.kind[k] }}</span></a>{% endfor %}
+  </span>
+  <span class="toggle" role="group" aria-label="Buying format">
+    {% for b, label in [('', 'Any'), ('bin', 'Buy now'), ('auction', 'Auction'), ('offers', 'Offers')] %}<a href="{{ qs(buy_=b) }}" class="{{ 'on' if buy == b }}"{{ ' aria-current="true"' | safe if buy == b }}>{{ label }} <span class="n">{{ counts.buy[b] }}</span></a>{% endfor %}
+  </span>
+  <span class="toggle" role="group" aria-labelledby="sort-l">
+    <span class="tl" id="sort-l">Sort</span>
+    {% for o, label in [('deal', 'Best'), ('price', 'Cheapest'), ('ending', 'Ending'), ('new', 'Newest')] %}<a href="{{ qs(sort_=o) }}" class="{{ 'on' if sort == o }}"{{ ' aria-current="true"' | safe if sort == o }}>{{ label }}</a>{% endfor %}
   </span>
   {% if not cur_want %}
   <span class="toggle">
@@ -43,6 +48,6 @@
   {% endif %}
 </nav>
 <div class="grid">
-{% for r in rows %}{% include "_card.html" %}{% else %}<p class="muted">{% if show == 'deals' %}No deals right now. <a href="{{ qs(show_='all') }}">See every live listing</a> or raise a ceiling on the Wants page.{% else %}No live listings yet. The next sweep will look again.{% endif %}</p>{% endfor %}
+{% for r in rows %}{% include "_card.html" %}{% else %}<p class="muted empty">{% if kind or buy %}Nothing matches these filters. <a href="{{ qs(kind_='', buy_='') }}">Show graded and raw in any format</a>.{% elif show == 'deals' %}No deals right now. <a href="{{ qs(show_='all') }}">See every live listing</a> or raise a ceiling on the Wants page.{% else %}No live listings yet. The next sweep will look again.{% endif %}</p>{% endfor %}
 </div>
 {% endblock %}

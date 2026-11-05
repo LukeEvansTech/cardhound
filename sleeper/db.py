@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS listings (
     last_run INTEGER,
     low_usd REAL,
     active INTEGER NOT NULL DEFAULT 1,
+    ends TEXT,
     PRIMARY KEY (item_id, kind)
 );
 CREATE INDEX IF NOT EXISTS listings_want ON listings (want_id);
@@ -106,6 +107,9 @@ class DB:
         self.path = path
         with self.tx() as c:
             c.executescript(SCHEMA)
+            cols = {r["name"] for r in c.execute("PRAGMA table_info(listings)")}
+            if "ends" not in cols:  # auction end time, added 2026-11-05
+                c.execute("ALTER TABLE listings ADD COLUMN ends TEXT")
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:

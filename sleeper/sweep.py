@@ -63,7 +63,9 @@ def collect(
 
     def fetch(url: str) -> list[dict] | None:
         if url not in cache:
-            cache[url] = b.search(url)
+            got, seen = b.search(url), dt.datetime.now()
+            # countdowns count from the fetch, not from when a sibling print reuses the rows
+            cache[url] = None if got is None else [{**r, "seen": seen} for r in got]
         return cache[url]
 
     for kind, q in match.searches(w):
@@ -98,7 +100,7 @@ def collect(
             ship = match.shipping(r["text"])
             cap = match.ceiling(w, kind, star, defaults)
             bids = re.search(r"\d+ bids?", r["text"])
-            left = re.search(r"\d+[dhm] \d+[hm] left", r["text"])
+            left, span = match.left_of(r["text"])
             found.append(
                 {
                     "item_id": r["id"],
@@ -110,7 +112,13 @@ def collect(
                     "star": star,
                     "auction": int(bool(bids)),
                     "bids": bids.group(0) if bids else "",
-                    "time_left": left.group(0) if left else "",
+                    "time_left": left,
+                    "ends": r.get("ends")
+                    or (
+                        (r["seen"] + span).isoformat(timespec="minutes")
+                        if span is not None
+                        else None
+                    ),
                     "obo": int("or Best Offer" in r["text"]),
                     "img": r.get("img", ""),
                     "cap": cap,
@@ -186,13 +194,14 @@ def store(db: DB, run_id: int, found: list[dict], sold: list[dict], searched: li
             c.execute(
                 """INSERT INTO listings (item_id, kind, want_id, title, usd, ship, star, auction, bids,
                        time_left, obo, img, cap, deal, first_seen, last_seen, first_run, last_run,
-                       low_usd, active)
+                       low_usd, active, ends)
                    VALUES (:item_id, :kind, :want_id, :title, :usd, :ship, :star, :auction, :bids,
-                       :time_left, :obo, :img, :cap, :deal, :now, :now, :run, :run, :usd, 1)
+                       :time_left, :obo, :img, :cap, :deal, :now, :now, :run, :run, :usd, 1, :ends)
                    ON CONFLICT(item_id, kind) DO UPDATE SET
                        want_id = excluded.want_id, title = excluded.title, usd = excluded.usd,
                        ship = excluded.ship, star = excluded.star, auction = excluded.auction,
                        bids = excluded.bids, time_left = excluded.time_left, obo = excluded.obo,
+                       ends = excluded.ends,
                        img = excluded.img, cap = excluded.cap, deal = excluded.deal,
                        last_seen = excluded.last_seen, last_run = excluded.last_run,
                        low_usd = min(listings.low_usd, excluded.usd), active = 1""",

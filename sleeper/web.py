@@ -9,6 +9,7 @@ import re
 import threading
 import urllib.parse
 from pathlib import Path
+from typing import Any, Callable
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
@@ -59,6 +60,27 @@ def buy_links(w: dict) -> list[tuple[str, str]]:
         ("Mercari US", f"https://www.mercari.com/search/?keyword={enc(plain)}"),
         ("PWCC / Fanatics Collect", f"https://www.fanaticscollect.com/search?q={enc(plain)}"),
     ]
+
+
+def ends_at(r: dict) -> float:
+    """Auction end as a timestamp; listings without one (not auctions, or not seen since) go last."""
+    if not r.get("auction") or not r.get("ends"):
+        return float("inf")
+    return dt.datetime.fromisoformat(r["ends"]).timestamp()
+
+
+BUY_FILTERS: dict[str, Callable[[dict], bool]] = {
+    "": lambda r: True,
+    "bin": lambda r: not r["auction"],
+    "auction": lambda r: bool(r["auction"]),
+    "offers": lambda r: bool(r["obo"]),
+}
+SORTS: dict[str, Callable[[dict], Any]] = {
+    "deal": lambda r: (not r["deal"], RATING_ORDER.get(r["v"].rating, 9), r["v"].total),
+    "price": lambda r: r["v"].total,
+    "ending": lambda r: (ends_at(r), r["v"].total),
+    "new": lambda r: -dt.datetime.fromisoformat(r["first_seen"]).timestamp(),
+}
 
 
 def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False) -> FastAPI:
@@ -156,7 +178,15 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         )
 
     @app.get("/", response_class=HTMLResponse)
-    def home(request: Request, set: str = "", kind: str = "", show: str = "deals", want: int = 0):
+    def home(
+        request: Request,
+        set: str = "",
+        kind: str = "",
+        show: str = "deals",
+        want: int = 0,
+        buy: str = "",
+        sort: str = "deal",
+    ):
         sql = "SELECT * FROM listings WHERE active = 1"
         args: list = []
         cur_want = db.want(want) if want else None
@@ -167,13 +197,25 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             args.append(want)
         if show == "deals":
             sql += " AND deal = 1"
-        if kind in ("psa", "raw"):
-            sql += " AND kind = ?"
-            args.append(kind)
         rows = scored([dict(r) for r in db.all(sql, *args)])
         if set:
             rows = [r for r in rows if r["want"].get("set") == set]
-        rows.sort(key=lambda r: (not r["deal"], RATING_ORDER.get(r["v"].rating, 9), r["v"].total))
+        kind = kind if kind in ("psa", "raw") else ""
+        buy = buy if buy in BUY_FILTERS else ""
+        sort = sort if sort in SORTS else "deal"
+        # each chip counts what it would show with the other filter kept
+        counts = {
+            "kind": {
+                k: sum(1 for r in rows if (not k or r["kind"] == k) and BUY_FILTERS[buy](r))
+                for k in ("", "psa", "raw")
+            },
+            "buy": {
+                b: sum(1 for r in rows if (not kind or r["kind"] == kind) and f(r))
+                for b, f in BUY_FILTERS.items()
+            },
+        }
+        rows = [r for r in rows if (not kind or r["kind"] == kind) and BUY_FILTERS[buy](r)]
+        rows.sort(key=SORTS[sort])
         sets = sorted({w.get("set", "") for w in db.wants()})
         last = db.one("SELECT * FROM runs ORDER BY id DESC LIMIT 1")
         return page(
@@ -184,6 +226,9 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             sets=sets,
             cur_set=set,
             kind=kind,
+            buy=buy,
+            sort=sort,
+            counts=counts,
             show=show,
             cur_want=cur_want,
             last=last,
