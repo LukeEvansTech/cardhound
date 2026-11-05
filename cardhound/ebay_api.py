@@ -211,8 +211,9 @@ class BrowseAPI:
                 self._warned_sold = True
             return []
         q, drop = split_query(p.get("_nkw", ""))
-        if not q:
-            return []
+        if not q:  # nothing to search for is a failed search, not an empty result
+            log.warning("no search terms left in %r", p.get("_nkw", ""))
+            return None
         if len(q) > Q_MAX:  # eBay would cut it, dropping terms; fail rather than search wrongly
             log.warning("query over %d characters for the Browse API: %s", Q_MAX, q)
             return None

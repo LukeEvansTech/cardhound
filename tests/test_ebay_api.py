@@ -169,6 +169,7 @@ def test_incomplete_or_bad_searches_fail():
     lots = {"total": 5000, "itemSummaries": [item(i, f"Cloud lot {i}") for i in range(200)]}
     assert api(FakeHTTP([lots] * 10)).search(match.search_url("cloud -lot")) is None
     assert api(FakeHTTP([])).search(match.search_url("x" * 120)) is None
+    assert api(FakeHTTP([])).search(match.search_url("-psa -bgs")) is None
     bad = FakeHTTP([{"total": 0, "itemSummaries": []}])
     real = bad.__call__
     bad_json = iter([b"not json"])
