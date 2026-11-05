@@ -184,6 +184,8 @@ def test_photo_downloads_stop_when_the_cdn_is_down(env, monkeypatch):
     assert len(calls) == 3
 
 
-def test_summary_needs_an_absolute_public_url(env, monkeypatch):
+@pytest.mark.usefixtures("env")
+def test_summary_needs_an_absolute_public_url(monkeypatch):
+    assert config.load().summary_on
     monkeypatch.setenv("SLEEPER_PUBLIC_URL", "")
     assert not config.load().summary_on
