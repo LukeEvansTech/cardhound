@@ -7,11 +7,11 @@ ENV APP_VERSION=${VERSION} \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
-    CARDHOUND_DATA=/data \
+    SLEEPER_DATA=/data \
     HOME=/tmp
 
-LABEL org.opencontainers.image.source="https://github.com/LukeEvansTech/cardhound" \
-      org.opencontainers.image.title="cardhound" \
+LABEL org.opencontainers.image.source="https://github.com/LukeEvansTech/sleeper" \
+      org.opencontainers.image.title="sleeper" \
       org.opencontainers.image.description="Trading-card deal finder with a deal page per alert" \
       org.opencontainers.image.version="${VERSION}"
 
@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && rm -rf /var/lib/apt/lists/* \
     && chmod -R a+rX /ms-playwright
 
-COPY cardhound ./cardhound
+COPY sleeper ./sleeper
 
 RUN mkdir -p /data && chown -R 65532:65532 /data
 VOLUME ["/data"]
@@ -33,5 +33,5 @@ USER 65532:65532
 # Kubernetes probes own liveness (/health); an image healthcheck would double-probe.
 HEALTHCHECK NONE
 EXPOSE 8080
-ENTRYPOINT ["python", "-m", "cardhound"]
+ENTRYPOINT ["python", "-m", "sleeper"]
 CMD ["serve"]

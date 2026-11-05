@@ -63,7 +63,7 @@ def buy_links(w: dict) -> list[tuple[str, str]]:
 
 def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False) -> FastAPI:
     db = db or DB(s.db_path)
-    app = FastAPI(title="cardhound", docs_url=None, redoc_url=None)
+    app = FastAPI(title="sleeper", docs_url=None, redoc_url=None)
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
     @app.middleware("http")
@@ -144,15 +144,15 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         live = db.one("SELECT count(*) AS n FROM listings WHERE active = 1 AND deal = 1")
         wants = db.one("SELECT count(*) AS n FROM wants WHERE enabled = 1")
         return (
-            "# HELP cardhound_last_success_timestamp_seconds End of the last sweep that searched "
-            "and alerted without a failure.\n# TYPE cardhound_last_success_timestamp_seconds gauge\n"
-            f"cardhound_last_success_timestamp_seconds {int(last['t']) if last and last['t'] else 0}\n"
-            "# TYPE cardhound_run_in_progress gauge\n"
-            f"cardhound_run_in_progress {int(sweep.LOCK.locked())}\n"
-            "# TYPE cardhound_live_deals gauge\n"
-            f"cardhound_live_deals {live['n'] if live else 0}\n"
-            "# TYPE cardhound_wants gauge\n"
-            f"cardhound_wants {wants['n'] if wants else 0}\n"
+            "# HELP sleeper_last_success_timestamp_seconds End of the last sweep that searched "
+            "and alerted without a failure.\n# TYPE sleeper_last_success_timestamp_seconds gauge\n"
+            f"sleeper_last_success_timestamp_seconds {int(last['t']) if last and last['t'] else 0}\n"
+            "# TYPE sleeper_run_in_progress gauge\n"
+            f"sleeper_run_in_progress {int(sweep.LOCK.locked())}\n"
+            "# TYPE sleeper_live_deals gauge\n"
+            f"sleeper_live_deals {live['n'] if live else 0}\n"
+            "# TYPE sleeper_wants gauge\n"
+            f"sleeper_wants {wants['n'] if wants else 0}\n"
         )
 
     @app.get("/", response_class=HTMLResponse)
@@ -445,14 +445,55 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     def ops_test():
         res = notify.send(
             s.apprise_urls,
-            "cardhound test alert",
+            "sleeper test alert",
             "Tap to open the deal list.",
             s.link("/"),
-            "Open cardhound",
+            "Open sleeper",
         )
         return PlainTextResponse(res)
 
     # --- import, images ---
+    @app.get("/api/search")
+    def api_search() -> dict:
+        """What the Cmd-K search filters in the browser: every want and every live deal."""
+        counts = {
+            r["want_id"]: (r["n"], r["d"] or 0)
+            for r in db.all(
+                "SELECT want_id, count(*) AS n, sum(deal) AS d FROM listings WHERE active = 1 "
+                "GROUP BY want_id"
+            )
+        }
+        wants_out = []
+        for w in db.wants():
+            refs = photos.refs_for(w, s.refs_dir)
+            kept = [r for r in refs if r.name not in set_of(w.get("skip"))] or refs
+            n, d = counts.get(w["_id"], (0, 0))
+            wants_out.append(
+                {
+                    "name": w["who"],
+                    "set": w.get("set", ""),
+                    "href": f"/?want={w['_id']}&show=all",
+                    "img": f"/refs/{kept[0].name}" if kept else "",
+                    "side": f"{d} deal{'s' if d != 1 else ''}, {n} live",
+                }
+            )
+        deals = scored(
+            [dict(r) for r in db.all("SELECT * FROM listings WHERE active = 1 AND deal = 1")]
+        )
+        deals.sort(key=lambda r: (RATING_ORDER.get(r["v"].rating, 9), r["v"].total))
+        deals_out = [
+            {
+                "name": r["want"]["who"],
+                "set": r["want"].get("set", ""),
+                "kind": "psa 10" if r["kind"] == "psa" else "raw",
+                "href": f"/deal/{r['item_id']}/{r['kind']}",
+                "img": ebay_img(r["img"], 140),
+                "side": f"${r['v'].total:,.2f} {r['v'].rating}",
+            }
+            for r in deals
+        ]
+        return {"wants": wants_out, "deals": deals_out}
+
     @app.post("/api/import")
     async def api_import(request: Request) -> dict:
         """Load a wantwatch export: {wants, defaults, block, gem_rates, pop: {fetched, rows}, sold}."""

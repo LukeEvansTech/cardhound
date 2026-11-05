@@ -20,7 +20,7 @@ def next_time(expr: str, tz: str, now: dt.datetime | None = None) -> dt.datetime
 
 def start(expr: str, tz: str, job) -> threading.Thread:
     if not croniter.is_valid(expr):
-        raise ValueError(f"invalid CARDHOUND_SCHEDULE: {expr!r}")
+        raise ValueError(f"invalid SLEEPER_SCHEDULE: {expr!r}")
 
     def loop() -> None:
         while True:

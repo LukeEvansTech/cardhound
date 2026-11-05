@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% macro qs(show_=show, kind_=kind, set_=cur_set) -%}
+?show={{ show_ }}{% if kind_ %}&amp;kind={{ kind_ }}{% endif %}{% if set_ %}&amp;set={{ set_ | urlencode }}{% endif %}{% if cur_want %}&amp;want={{ cur_want._id }}{% endif %}
+{%- endmacro %}
+{% block title %}{{ cur_want.who if cur_want else ('Deals' if show == 'deals' else 'Live listings') }} · sleeper{% endblock %}
+{% block body %}
+{% if cur_want %}
+<section class="head-row want-head">
+  <div>
+    <p class="muted small"><a href="/wants">Wants</a> / {{ cur_want.set }}</p>
+    <h1>{{ cur_want.who }}</h1>
+    <p class="muted">{{ total }} {{ 'deal' if show == 'deals' else 'live listing' }}{{ 's' if total != 1 }}{% if cur_want.cards %}. {{ cur_want.cards }}{% endif %}</p>
+  </div>
+  <div class="actions">
+    <a class="button" href="/wants/{{ cur_want._id }}">Edit want</a>
+    <form method="post" action="/wants/{{ cur_want._id }}/sweep"><button>Sweep this card</button></form>
+  </div>
+</section>
+{% else %}
+<section class="head-row">
+  <h1>{% if show == 'deals' %}{{ total }} deal{{ 's' if total != 1 }}{% else %}{{ total }} live listing{{ 's' if total != 1 }}{% endif %}</h1>
+  <p class="muted small">
+    {% if running %}A sweep is running now. {% endif %}
+    {% if last %}Last sweep {{ last.status }}, started {{ last.started }} UTC: {{ last.listings }} listings checked.{% else %}No sweep yet: <a href="/ops">start one</a> or add cards.{% endif %}
+  </p>
+</section>
+{% endif %}
+<nav class="filters" aria-label="Filter listings">
+  <span class="toggle">
+    <a href="{{ qs(show_='deals') }}" class="{{ 'on' if show == 'deals' }}">Deals</a>
+    <a href="{{ qs(show_='all') }}" class="{{ 'on' if show == 'all' }}">All live</a>
+  </span>
+  <span class="toggle">
+    <a href="{{ qs(kind_='') }}" class="{{ 'on' if not kind }}">PSA 10 and raw</a>
+    <a href="{{ qs(kind_='psa') }}" class="{{ 'on' if kind == 'psa' }}">PSA 10</a>
+    <a href="{{ qs(kind_='raw') }}" class="{{ 'on' if kind == 'raw' }}">Raw</a>
+  </span>
+  {% if not cur_want %}
+  <span class="toggle">
+    <a href="{{ qs(set_='') }}" class="{{ 'on' if not cur_set }}">All sets</a>
+    {% for x in sets %}<a href="{{ qs(set_=x) }}" class="{{ 'on' if x == cur_set }}">{{ x }}</a>{% endfor %}
+  </span>
+  {% endif %}
+</nav>
+<div class="grid">
+{% for r in rows %}{% include "_card.html" %}{% else %}<p class="muted">{% if show == 'deals' %}No deals right now. <a href="{{ qs(show_='all') }}">See every live listing</a> or raise a ceiling on the Wants page.{% else %}No live listings yet. The next sweep will look again.{% endif %}</p>{% endfor %}
+</div>
+{% endblock %}

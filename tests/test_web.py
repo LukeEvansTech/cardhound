@@ -3,10 +3,10 @@
 import datetime as dt
 
 import pytest
-from cardhound import config, photos, sweep
-from cardhound.db import DB
-from cardhound.web import create_app
 from fastapi.testclient import TestClient
+from sleeper import config, photos, sweep
+from sleeper.db import DB
+from sleeper.web import create_app
 
 
 class FakeBrowser:
@@ -28,8 +28,8 @@ class FakeBrowser:
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
-    monkeypatch.setenv("CARDHOUND_DATA", str(tmp_path))
-    monkeypatch.setenv("CARDHOUND_PUBLIC_URL", "https://cardhound.example")
+    monkeypatch.setenv("SLEEPER_DATA", str(tmp_path))
+    monkeypatch.setenv("SLEEPER_PUBLIC_URL", "https://sleeper.example")
     s = config.load()
     db = DB(s.db_path)
     return s, db, TestClient(create_app(s, db))
@@ -64,7 +64,7 @@ def test_import_sweep_and_deal_page(env, monkeypatch):
     row2 = {**ROW, "id": "222", "price": "$650.00"}
     sweep.run(db, s, browser=lambda: FakeBrowser([ROW, row2]))
     assert len(sent) == 2
-    assert sent[1][3] == "https://cardhound.example/deal/222/psa"
+    assert sent[1][3] == "https://sleeper.example/deal/222/psa"
     page = client.get("/deal/222/psa")
     assert page.status_code == 200
     assert "Vegito" in page.text and "$656" in page.text
@@ -73,7 +73,7 @@ def test_import_sweep_and_deal_page(env, monkeypatch):
     assert client.get(f"/run/{run1}").status_code == 200
     assert client.get("/wants").status_code == 200
     assert client.get("/ops").status_code == 200
-    assert "cardhound_last_success_timestamp_seconds" in client.get("/metrics").text
+    assert "sleeper_last_success_timestamp_seconds" in client.get("/metrics").text
 
 
 def test_failed_send_is_retried_next_sweep(env, monkeypatch):
@@ -610,3 +610,11 @@ def test_deleting_a_family_want_keeps_comps_its_siblings_use(env):
     assert db.one("SELECT count(*) AS n FROM sold")["n"] == 1
     client.post(f"/wants/{db.wants()[0]['_id']}/delete")  # the last print of the card
     assert db.one("SELECT count(*) AS n FROM sold")["n"] == 0
+
+
+def test_a_cardhound_database_is_carried_over(tmp_path, monkeypatch):
+    monkeypatch.setenv("SLEEPER_DATA", str(tmp_path))
+    (tmp_path / "cardhound.db").write_bytes(b"x" * 10)
+    s = config.load()
+    assert s.db_path.read_bytes() == b"x" * 10
+    assert not (tmp_path / "cardhound.db").exists()
