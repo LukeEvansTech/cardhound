@@ -1252,10 +1252,55 @@ kbd {
   }
 }
 
-/* --- summary: the email body, shown as the paper it arrives on --- */
+/* --- summary: the email body, recoloured by the app theme (its inline colours are light-only) --- */
 
 .summary-paper {
+  max-width: 720px;
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow);
+  background: var(--panel);
+}
+
+.summary-paper .sx-paper {
+  max-width: none !important;
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+}
+
+.summary-paper .sx-ink {
+  color: var(--ink) !important;
+}
+
+.summary-paper .sx-muted {
+  color: var(--muted) !important;
+}
+
+.summary-paper .sx-rule {
+  border-color: var(--line) !important;
+}
+
+.summary-paper .sx-link {
+  color: var(--accent) !important;
+}
+
+.summary-paper .sx-great {
+  color: var(--great) !important;
+}
+
+.summary-paper .sx-good {
+  color: var(--good) !important;
+}
+
+.summary-paper .sx-fair {
+  color: var(--fair) !important;
+}
+
+.summary-paper .sx-high,
+.summary-paper .sx-bad {
+  color: var(--high) !important;
+}
+
+.summary-paper .sx-unknown {
+  color: var(--unknown) !important;
 }

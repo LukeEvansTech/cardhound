@@ -1,18 +1,20 @@
-{# The daily summary, email-safe: tables and inline styles only. g from summary.gather, img(r) -> src, link(path) -> URL. #}
-{% set ink = '#1d2433' %}{% set muted = '#5b6475' %}{% set rule = '#e3e6ec' %}{% set accent = '#0b6e69' %}
-{% set tone = {'great': '#1a7f37', 'good': '#1a7f37', 'unknown': '#5b6475', 'fair': '#9a6700', 'high': '#b42318'} %}
+{# The daily summary, email-safe: tables and inline styles, light by default (Outlook on Windows
+   reads nothing else). The sx-* classes let the email's dark stylesheet and the app's theme
+   override the colours. g from summary.gather, img(r) -> src, link(path) -> URL. #}
+{% set c = {'ink': '#15202b', 'muted': '#525d69', 'rule': '#d5dae0', 'accent': '#0a6870', 'bad': '#b02e18'} %}
+{% set tone = {'great': '#14703d', 'good': '#36702a', 'unknown': '#58626e', 'fair': '#835800', 'high': '#b02e18'} %}
 {% macro card(r) -%}
 <tr>
-  <td width="96" valign="top" style="padding:12px 12px 12px 0;border-top:1px solid {{ rule }};">
+  <td width="96" valign="top" class="sx-rule" style="padding:12px 12px 12px 0;border-top:1px solid {{ c.rule }};">
     {% set src = img(r) %}{% if src %}<a href="{{ link('/deal/' ~ r.item_id ~ '/' ~ r.kind) }}"><img src="{{ src }}" width="84" alt="" style="display:block;width:84px;max-height:120px;border-radius:4px;border:0;object-fit:cover;"></a>{% endif %}
   </td>
-  <td valign="top" style="padding:12px 0;border-top:1px solid {{ rule }};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:{{ ink }};">
-    <a href="{{ link('/deal/' ~ r.item_id ~ '/' ~ r.kind) }}" style="color:{{ ink }};font-weight:bold;font-size:15px;text-decoration:none;">{{ r.want.who }}</a><br>
-    <span style="color:{{ muted }};">{{ r.want.set }} / {{ 'PSA 10' if r.kind == 'psa' else 'raw' }}{% if r.star and r.star != '-' %} {{ r.star | star }}{% endif %}</span><br>
+  <td valign="top" class="sx-rule sx-ink" style="padding:12px 0;border-top:1px solid {{ c.rule }};font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:{{ c.ink }};">
+    <a href="{{ link('/deal/' ~ r.item_id ~ '/' ~ r.kind) }}" class="sx-ink" style="color:{{ c.ink }};font-weight:bold;font-size:15px;text-decoration:none;">{{ r.want.who }}</a><br>
+    <span class="sx-muted" style="color:{{ c.muted }};">{{ r.want.set }} / {{ 'PSA 10' if r.kind == 'psa' else 'raw' }}{% if r.star and r.star != '-' %} {{ r.star | star }}{% endif %}</span><br>
     <span style="font-size:17px;font-weight:bold;">{{ r.v.total | money }}</span>
-    <span style="color:{{ tone.get(r.v.rating, muted) }};font-weight:bold;">&nbsp;{{ r.v.rating }}</span>
-    {% if r.v.market %}<span style="color:{{ muted }};">&nbsp;{{ (r.v.market * 100) | round | int }}% of market</span>{% endif %}<br>
-    <span style="color:{{ muted }};">
+    <span class="sx-{{ r.v.rating }}" style="color:{{ tone.get(r.v.rating, c.muted) }};font-weight:bold;">&nbsp;{{ r.v.rating }}</span>
+    {% if r.v.market %}<span class="sx-muted" style="color:{{ c.muted }};">&nbsp;{{ (r.v.market * 100) | round | int }}% of market</span>{% endif %}<br>
+    <span class="sx-muted" style="color:{{ c.muted }};">
       {%- if r.cap %}ceiling {{ r.cap | money }}{% endif %}
       {%- if r.auction %}{{ ', ' if r.cap }}{{ r.bids or 'no bids' }}{% if r.ends %}, ends {{ r.ends | when }}{% endif %}{% else %}{{ ', ' if r.cap }}buy it now{% endif %}
       {%- if r.obo %}, takes offers{% endif %}
@@ -22,28 +24,28 @@
 {%- endmacro %}
 {% macro section(title, rows) -%}
 {% if rows %}
-<h2 style="margin:28px 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:17px;color:{{ ink }};">{{ title }}</h2>
+<h2 class="sx-ink" style="margin:28px 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:17px;color:{{ c.ink }};">{{ title }}</h2>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
 {% for r in rows[:cap] %}{{ card(r) }}{% endfor %}
 </table>
-{% if rows | length > cap %}<p style="margin:8px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:{{ muted }};">And {{ rows | length - cap }} more on the <a href="{{ link('/') }}" style="color:{{ accent }};">Deals page</a>.</p>{% endif %}
+{% if rows | length > cap %}<p class="sx-muted" style="margin:8px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:{{ c.muted }};">And {{ rows | length - cap }} more on the <a href="{{ link('/') }}" class="sx-link" style="color:{{ c.accent }};">Deals page</a>.</p>{% endif %}
 {% endif %}
 {%- endmacro %}
-<div style="max-width:600px;margin:0 auto;padding:24px;background:#ffffff;color:{{ ink }};font-family:Arial,Helvetica,sans-serif;">
-  <p style="margin:0;font-size:13px;color:{{ muted }};">Sleeper, {{ g.now.strftime('%A %-d %B') }}</p>
-  <h1 style="margin:4px 0 8px;font-size:24px;line-height:30px;color:{{ ink }};">
+<div class="sx-paper" style="max-width:600px;margin:0 auto;padding:24px;background:#ffffff;color:{{ c.ink }};font-family:Arial,Helvetica,sans-serif;">
+  <p class="sx-muted" style="margin:0;font-size:13px;color:{{ c.muted }};">Sleeper, {{ g.now.strftime('%A %-d %B') }}</p>
+  <h1 class="sx-ink" style="margin:4px 0 8px;font-size:24px;line-height:30px;color:{{ c.ink }};">
     {%- if g.new_count %}{{ g.new_count }} new deal{{ 's' if g.new_count != 1 }}{% else %}No new deals{% endif %}</h1>
-  <p style="margin:0;font-size:14px;line-height:21px;color:{{ ink }};">
+  <p class="sx-ink" style="margin:0;font-size:14px;line-height:21px;color:{{ c.ink }};">
     {{ g.live }} deal{{ 's' if g.live != 1 }} live: {{ g.live_graded }} graded, {{ g.live_raw }} raw.
-    {% if g.runs == 0 %}<b style="color:#b42318;">No sweeps ran since the last summary.</b>
-    {% elif g.bad_runs %}<b style="color:#b42318;">{{ g.bad_runs }} of {{ g.runs }} sweeps had a problem:</b> <a href="{{ link('/ops') }}" style="color:{{ accent }};">see Runs</a>.
+    {% if g.runs == 0 %}<b class="sx-bad" style="color:{{ c.bad }};">No sweeps ran since the last summary.</b>
+    {% elif g.bad_runs %}<b class="sx-bad" style="color:{{ c.bad }};">{{ g.bad_runs }} of {{ g.runs }} sweeps had a problem:</b> <a href="{{ link('/ops') }}" class="sx-link" style="color:{{ c.accent }};">see Runs</a>.
     {% else %}{{ g.runs }} sweep{{ 's' if g.runs != 1 }} ran.{% endif %}
-    {% if g.failed_searches %}<span style="color:{{ muted }};">{{ g.failed_searches }} of {{ g.searches }} searches failed; each is tried again next sweep.</span>{% endif %}
+    {% if g.failed_searches %}<span class="sx-muted" style="color:{{ c.muted }};">{{ g.failed_searches }} of {{ "{:,}".format(g.searches) }} searches failed; each is tried again next sweep.</span>{% endif %}
   </p>
   {{ section('Auctions ending in the next 24 hours', g.ending) }}
   {{ section('New graded deals', g.new_graded) }}
   {{ section('New raw deals', g.new_raw) }}
-  <p style="margin:28px 0 0;padding-top:16px;border-top:1px solid {{ rule }};font-size:13px;color:{{ muted }};">
-    <a href="{{ link('/') }}" style="color:{{ accent }};">Open all deals</a> &nbsp;&middot;&nbsp; <a href="{{ link('/summary') }}" style="color:{{ accent }};">This summary on the web</a>
+  <p class="sx-rule sx-muted" style="margin:28px 0 0;padding-top:16px;border-top:1px solid {{ c.rule }};font-size:13px;color:{{ c.muted }};">
+    <a href="{{ link('/') }}" class="sx-link" style="color:{{ c.accent }};">Open all deals</a> &nbsp;&middot;&nbsp; <a href="{{ link('/summary') }}" class="sx-link" style="color:{{ c.accent }};">This summary on the web</a>
   </p>
 </div>
