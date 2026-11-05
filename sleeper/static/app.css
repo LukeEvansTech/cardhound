@@ -1251,3 +1251,11 @@ kbd {
     backdrop-filter: none;
   }
 }
+
+/* --- summary: the email body, shown as the paper it arrives on --- */
+
+.summary-paper {
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}

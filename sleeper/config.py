@@ -39,12 +39,24 @@ class Settings:
     ebay_client_secret: str = field(
         default_factory=lambda: os.environ.get("EBAY_CLIENT_SECRET", "")
     )
+    # Daily summary email through an SMTP relay; off until host, sender and recipient are all set.
+    smtp_host: str = field(default_factory=lambda: os.environ.get("SLEEPER_SMTP_HOST", ""))
+    smtp_port: int = field(default_factory=lambda: int(os.environ.get("SLEEPER_SMTP_PORT", "25")))
+    mail_from: str = field(default_factory=lambda: os.environ.get("SLEEPER_MAIL_FROM", ""))
+    summary_to: str = field(default_factory=lambda: os.environ.get("SLEEPER_SUMMARY_TO", ""))
+    summary_schedule: str = field(
+        default_factory=lambda: os.environ.get("SLEEPER_SUMMARY_SCHEDULE", "30 8 * * *")
+    )
     headless: bool = field(default_factory=lambda: os.environ.get("SLEEPER_HEADLESS", "1") != "0")
     version: str = field(default_factory=lambda: os.environ.get("APP_VERSION", "0.0.0-dev"))
 
     @property
     def ebay_api(self) -> bool:
         return bool(self.ebay_client_id and self.ebay_client_secret)
+
+    @property
+    def summary_on(self) -> bool:
+        return bool(self.smtp_host and self.mail_from and self.summary_to)
 
     @property
     def db_path(self) -> Path:

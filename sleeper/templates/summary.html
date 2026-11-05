@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Summary · sleeper{% endblock %}
+{% block body %}
+<section class="head-row">
+  <h1>Today's summary</h1>
+  <p class="muted small">
+    {%- if mail_on %}Emailed to {{ to }} at {{ next_at.strftime('%H:%M') }} each day. {% if last_result %}Last: {{ last_result }}.{% endif %}
+    {%- else %}The daily email is off: it needs SLEEPER_SMTP_HOST, SLEEPER_MAIL_FROM and SLEEPER_SUMMARY_TO.{% endif %}
+    This page shows what the next email would say.
+  </p>
+  {% if mail_on %}<form method="post" action="/summary/send"><button>Send it now</button></form>{% endif %}
+</section>
+<div class="summary-paper">{% include "_summary_body.html" %}</div>
+{% endblock %}
