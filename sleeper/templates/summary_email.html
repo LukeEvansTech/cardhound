@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>{{ title }}</title>
+<style>
+  :root { color-scheme: light dark; supported-color-schemes: light dark; }
+  @media (prefers-color-scheme: dark) {
+    .sx-body { background: #0f1620 !important; }
+    .sx-paper { background: #172231 !important; color: #e6ebf1 !important; }
+    .sx-ink { color: #e6ebf1 !important; }
+    .sx-muted { color: #93a1b1 !important; }
+    .sx-rule { border-color: #263345 !important; }
+    .sx-link { color: #3fb5bf !important; }
+    .sx-bad, .sx-high { color: #f0705a !important; }
+    .sx-great { color: #45c27a !important; }
+    .sx-good { color: #8cc56b !important; }
+    .sx-fair { color: #e0a63a !important; }
+    .sx-unknown { color: #8a96a5 !important; }
+  }
+  /* Outlook.com marks its dark mode with data-ogsc / data-ogsb */
+  [data-ogsb] .sx-body { background: #0f1620 !important; }
+  [data-ogsb] .sx-paper { background: #172231 !important; }
+  [data-ogsc] .sx-paper, [data-ogsc] .sx-ink { color: #e6ebf1 !important; }
+  [data-ogsc] .sx-muted { color: #93a1b1 !important; }
+  [data-ogsc] .sx-link { color: #3fb5bf !important; }
+  [data-ogsc] .sx-great { color: #45c27a !important; }
+  [data-ogsc] .sx-good { color: #8cc56b !important; }
+  [data-ogsc] .sx-fair { color: #e0a63a !important; }
+  [data-ogsc] .sx-bad, [data-ogsc] .sx-high { color: #f0705a !important; }
+</style>
+</head>
+<body class="sx-body" style="margin:0;padding:0;background:#eef0f2;">
+{% include "_summary_body.html" %}
+</body>
+</html>

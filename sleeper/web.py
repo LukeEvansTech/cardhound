@@ -10,13 +10,14 @@ import threading
 import urllib.parse
 from pathlib import Path
 from typing import Any, Callable
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import match, notify, photos, sweep, value
+from . import match, notify, photos, summary, sweep, value
 from .config import Settings
 from .db import DB
 
@@ -104,6 +105,17 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     tpl.env.filters["ebay_img"] = ebay_img
     tpl.env.filters["pct"] = pct
     tpl.env.globals["version"] = s.version
+
+    def when(iso: str) -> str:
+        """An auction end in the app's timezone: '14:05 today', 'Fri 09:10'."""
+        at = dt.datetime.fromisoformat(iso).astimezone(ZoneInfo(s.timezone))
+        today = dt.datetime.now(ZoneInfo(s.timezone)).date()
+        if at.date() == today:
+            return f"{at:%H:%M} today"
+        return f"{at:%a %H:%M}" if (at.date() - today).days < 6 else f"{at:%a %-d %b %H:%M}"
+
+    tpl.env.filters["when"] = when
+    tpl.env.filters["day"] = lambda at: f"{at.astimezone(ZoneInfo(s.timezone)):%A %-d %B}"
     progress: list[str] = []
 
     def art_choices(w: dict) -> list[dict]:
@@ -133,10 +145,46 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         ).start()
         return True
 
+    def render_summary(g: dict, img: Callable[[dict], str]) -> tuple[str, str]:
+        """The summary email as (html, plain text)."""
+        title = summary.subject(g)
+        html = tpl.get_template("summary_email.html").render(
+            g=g, img=img, link=s.link, cap=summary.MAX_CARDS, title=title
+        )
+        lines = [title, ""]
+        for head, rows in (
+            ("Auctions ending in the next 24 hours", g["ending"]),
+            ("New graded deals", g["new_graded"]),
+            ("New raw deals", g["new_raw"]),
+        ):
+            if rows:
+                lines.append(head)
+                for r in rows[: summary.MAX_CARDS]:
+                    lines.append(
+                        f"- {r['want']['who']}: {money(r['v'].total)} {r['v'].rating} "
+                        f"{s.link('/deal/' + r['item_id'] + '/' + r['kind'])}"
+                    )
+                lines.append("")
+        lines.append(f"{g['live']} deals live. All deals: {s.link('/')}")
+        if g["runs"] == 0:
+            lines.append("No sweeps ran since the last summary.")
+        elif g["bad_runs"]:
+            lines.append(f"{g['bad_runs']} of {g['runs']} sweeps had a problem: {s.link('/ops')}")
+        if g["failed_searches"]:
+            lines.append(f"{g['failed_searches']} of {g['searches']:,} searches failed.")
+        return html, "\n".join(lines)
+
     if start_scheduler:
         from . import scheduler
 
         scheduler.start(s.schedule, s.timezone, lambda: start_sweep("schedule"))
+        if s.summary_on:
+            scheduler.start(
+                s.summary_schedule,
+                s.timezone,
+                lambda: summary.run(db, s, render_summary),
+                name="summary email",
+            )
 
     def scored(rows: list[dict]) -> list[dict]:
         wants = {w["_id"]: w for w in db.wants()}
@@ -475,6 +523,38 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             defaults=db.defaults(),
             gem_rates=db.gem_rates(),
         )
+
+    @app.get("/summary", response_class=HTMLResponse)
+    def summary_page(request: Request):
+        from . import scheduler
+
+        g = summary.gather(db, s)
+        return page(
+            request,
+            "summary.html",
+            g=g,
+            img=lambda r: ebay_img(r["img"], 225),
+            link=s.link,
+            cap=summary.MAX_CARDS,
+            mail_on=s.summary_on,
+            to=s.summary_to,
+            next_at=scheduler.next_time(s.summary_schedule, s.timezone),
+            last_result=db.get("summary_last_result", ""),
+        )
+
+    @app.get("/summary/last", response_class=HTMLResponse)
+    def summary_last():
+        html = db.get(summary.LAST_HTML, "")
+        if not html:
+            raise HTTPException(404, "no summary has been sent yet")
+        return HTMLResponse(html)
+
+    @app.post("/summary/send")
+    def summary_send():
+        if not s.summary_on:
+            raise HTTPException(409, "the summary email is not configured")
+        summary.run(db, s, render_summary)
+        return RedirectResponse("/summary", status_code=303)
 
     @app.get("/ops/log", response_class=PlainTextResponse)
     def ops_log() -> str:
