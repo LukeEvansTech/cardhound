@@ -231,7 +231,9 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             for p in photos.refs_for(w, s.refs_dir)
             if p.name not in (w.get("skip") or [])
         )
-        refs_now = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+        refs_now = photos.ref_key(w, photos.refs_for(w, s.refs_dir)) + [
+            f"sib:{x}" for x in sorted(siblings(w, everyone))  # a new sibling print: judge again
+        ]
         moved = old.get("verdict") not in (None, "unchecked") and old.get("refs") != refs_now
         if (
             old
@@ -241,6 +243,7 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
         ):
             continue
         res = photos.check(w, r["item_id"], r["img"], s.refs_dir, s.photos_dir)
+        shots = [res["photo"]] if res.get("photo") else []
         if res["verdict"] in ("differs", "unclear", "unwanted"):
             srcs = []
             if b is not None and pages > 0:
@@ -250,6 +253,8 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             for i, src in enumerate(srcs):
                 alt = photos.check(w, f"{r['item_id']}_{i}", src, s.refs_dir, s.photos_dir)
                 complete = complete and alt["verdict"] != "unchecked"
+                if alt.get("photo"):
+                    shots.append(alt["photo"])
                 if alt["verdict"] == "match":  # a kept art matching beats any other score
                     res = alt
                     break
@@ -257,11 +262,8 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
                     res = alt
             # Until one of the listing's own photos was scored, the thumbnail verdict is provisional.
             res["retry"] = not complete and res["verdict"] != "match"
-        if (
-            res["verdict"] != "match"
-            and res.get("photo")
-            and move_to_sibling(db, s, r, w, everyone, res)
-        ):
+        res["refs"] = refs_now
+        if res["verdict"] != "match" and move_to_sibling(db, s, r, w, everyone, shots):
             continue
         db.run(
             "UPDATE listings SET art = ? WHERE item_id = ? AND kind = ?",
@@ -271,8 +273,16 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
         )
 
 
+def siblings(w: dict, wants: dict[int, dict]) -> list[int]:
+    """Other prints split from the same card."""
+    if not w.get("family"):
+        return []
+    fam = match.comp_id(w)
+    return [x["_id"] for x in wants.values() if x["_id"] != w["_id"] and match.comp_id(x) == fam]
+
+
 def move_to_sibling(
-    db: DB, s: Settings, r: Any, w: dict, wants: dict[int, dict], res: dict
+    db: DB, s: Settings, r: Any, w: dict, wants: dict[int, dict], shots: list[str]
 ) -> bool:
     """A photo that is another print of the same card moves the listing to that print's want."""
     family = match.comp_id(w)
@@ -286,10 +296,20 @@ def move_to_sibling(
     ]
     if not sibs or not w.get("family") and not any(x.get("family") for x in sibs):
         return False
-    key = res["photo"].rsplit(".", 1)[0]  # the photo already downloaded for the best score
     for sib in sibs:
-        got = photos.check(sib, key, "file:", s.refs_dir, s.photos_dir)
-        if got["verdict"] != "match":
+        # every photo already downloaded for this listing; "file:" means use the cached copy
+        got = next(
+            (
+                g
+                for g in (
+                    photos.check(sib, shot.rsplit(".", 1)[0], "file:", s.refs_dir, s.photos_dir)
+                    for shot in shots
+                )
+                if g["verdict"] == "match"
+            ),
+            None,
+        )
+        if got is None:
             continue
         cap = match.ceiling(sib, r["kind"], r["star"], db.defaults())
         deal = int(cap is not None and r["usd"] + (r["ship"] or 0) <= cap)
