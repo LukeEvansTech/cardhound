@@ -3,10 +3,10 @@
 import datetime as dt
 
 import pytest
+from fastapi.testclient import TestClient
 from sleeper import config, photos, sweep
 from sleeper.db import DB
 from sleeper.web import create_app
-from fastapi.testclient import TestClient
 
 
 class FakeBrowser:
