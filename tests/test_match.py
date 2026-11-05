@@ -140,3 +140,24 @@ def test_title_parallel_suffix_and_hyphenated_lists():
 
 def test_hyphenated_action_point_lists():
     assert match.card_numbers("AP03-AP04") == {"AP03", "AP04"}
+
+
+def test_single_print_wants_check_bare_numbers_and_stars():
+    w = {
+        "set": "FMA",
+        "who": "Edward Elric · 012 SR★★",
+        "match": "Edward Elric",
+        "cards": "UE09BT/FMA-1-012_p1 SR★★",
+    }
+    assert match.print_of(w) == ("012", "2")
+    assert match.print_of({"cards": "UEPR/FMA-1-039_p2 U"}) == ("039", "-")
+    assert match.print_of({"cards": "UE09BT/FMA-1-012_p1 SR★★, UE09BT/FMA-1-040_p1 SR★"}) is None
+
+    def keep(t):
+        return match.keep(w, "psa", t, t)
+
+    assert keep("Union Arena Edward Elric (012) 2 Star PSA 10")
+    assert keep("Union Arena Edward Elric 2 star psa 10 pop 1/250")  # a serial is not a card number
+    assert not keep("Union Arena Edward Elric #040 2 star psa 10")
+    assert not keep("Union Arena Edward Elric 1 star psa 10")
+    assert match.comp_id({"_id": 5, "family": 2}) == 2 and match.comp_id({"_id": 5}) == 5

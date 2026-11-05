@@ -1,5 +1,18 @@
 {% extends "base.html" %}
 {% block body %}
+{% if cur_want %}
+<section class="head-row want-head">
+  <div>
+    <p class="muted small"><a href="/wants">Wants</a> / {{ cur_want.set }}</p>
+    <h1>{{ cur_want.who }} <span class="muted">({{ total }} {{ 'deal' if show == 'deals' else 'live' }}{{ 's' if total != 1 and show == 'deals' }})</span></h1>
+    {% if cur_want.cards %}<p class="muted small">{{ cur_want.cards }}</p>{% endif %}
+  </div>
+  <div class="actions">
+    <a class="button" href="/wants/{{ cur_want._id }}">Edit want</a>
+    <form method="post" action="/wants/{{ cur_want._id }}/sweep"><button>Sweep this card</button></form>
+  </div>
+</section>
+{% else %}
 <section class="head-row">
   <h1>{{ 'Deals' if show == 'deals' else 'All live listings' }} <span class="muted">({{ total }})</span></h1>
   <p class="muted">
@@ -7,15 +20,17 @@
     {% if last %}Last sweep #{{ last.id }} {{ last.status }}, started {{ last.started }} UTC: {{ last.listings }} listings, {{ last.deals }} deals.{% else %}No sweep yet: <a href="/ops">start one</a> or add cards.{% endif %}
   </p>
 </section>
+{% endif %}
 <form class="filters" method="get">
+  {% if cur_want %}<input type="hidden" name="want" value="{{ cur_want._id }}">{% endif %}
   <select name="show" onchange="this.form.submit()">
     <option value="deals" {{ 'selected' if show == 'deals' }}>Deals only</option>
     <option value="all" {{ 'selected' if show == 'all' }}>All live listings</option>
   </select>
-  <select name="set" onchange="this.form.submit()">
+  {% if not cur_want %}<select name="set" onchange="this.form.submit()">
     <option value="">All sets</option>
     {% for x in sets %}<option {{ 'selected' if x == cur_set }}>{{ x }}</option>{% endfor %}
-  </select>
+  </select>{% endif %}
   <select name="kind" onchange="this.form.submit()">
     <option value="">PSA 10 and raw</option>
     <option value="psa" {{ 'selected' if kind == 'psa' }}>PSA 10 only</option>

@@ -519,3 +519,78 @@ def test_changed_art_gets_a_cached_verdict_judged_again(env, monkeypatch):
     db.run("UPDATE wants SET spec = json_set(spec, '$.skip', json(?))", '["x.jpg"]')
     sweep.run(db, s, browser=lambda: FakeBrowser([ROW]))
     assert len(calls) > first  # unticked art changed what the verdict means
+
+
+SPLIT = [
+    {
+        "set": "FMA",
+        "who": "Edward Elric · 012 SR★★",
+        "match": "Edward Elric",
+        "family": 900,
+        "cards": "UE09BT/FMA-1-012_p1 SR★★",
+        "max": {"2": 1000},
+    },
+    {
+        "set": "FMA",
+        "who": "Edward Elric · 040 SR★",
+        "match": "Edward Elric",
+        "family": 900,
+        "cards": "UE09BT/FMA-1-040_p1 SR★",
+        "max": {"1": 300},
+    },
+]
+
+
+class CountingBrowser(FakeBrowser):
+    calls = 0
+
+    def search(self, url):
+        CountingBrowser.calls += 1
+        return super().search(url)
+
+
+def ua_row(item_id, title, price="$200.00"):
+    return {"id": item_id, "title": title, "price": price, "text": f"{title} {price}", "img": ""}
+
+
+def test_split_prints_share_a_search_and_each_listing_has_one_print(env, monkeypatch):
+    s, db, client = env
+    monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
+    client.post("/api/import", json={"wants": [{**w, "raw": False} for w in SPLIT]})
+    ids = {w["who"]: w["_id"] for w in db.wants()}
+    rows = [
+        ua_row("1", "Union Arena Edward Elric FMA-1-012 2 Star PSA 10"),  # named and starred
+        ua_row("2", "Union Arena Edward Elric #040 1 Star PSA 10"),
+        ua_row("3", "Union Arena Edward Elric PSA 10 gem mint"),  # the title can't place it
+    ]
+    CountingBrowser.calls = 0
+    sweep.run(db, s, browser=lambda: CountingBrowser(rows))
+    assert CountingBrowser.calls == 1  # one query for both prints
+    got = {r["item_id"]: r["want_id"] for r in db.all("SELECT item_id, want_id FROM listings")}
+    assert got["1"] == ids["Edward Elric · 012 SR★★"]
+    assert got["2"] == ids["Edward Elric · 040 SR★"]
+    # unplaced: no star in the title, so no ceiling on either print and no deal until the photo says
+    assert db.one("SELECT deal FROM listings WHERE item_id = '3'")["deal"] == 0
+    page = client.get(f"/?want={ids['Edward Elric · 012 SR★★']}&show=all")
+    assert page.status_code == 200 and "Edit want" in page.text
+    assert client.get("/?want=99999").status_code == 404
+    wants_page = client.get("/wants").text
+    assert f"/?want={ids['Edward Elric · 040 SR★']}&amp;show=deals" in wants_page
+
+
+def test_sold_comps_for_a_split_card_go_to_its_family(env):
+    _, db, client = env
+    client.post("/api/import", json={"wants": SPLIT})
+    sold = {
+        "9": {
+            "set": "FMA",
+            "who": "Edward Elric",
+            "kind": "psa",
+            "star": "2",
+            "usd": 900,
+            "date": "2026-11-01",
+            "title": "x",
+        }
+    }
+    assert client.post("/api/sold", json={"sold": sold}).json()["added"] == 1
+    assert db.one("SELECT want_id FROM sold")["want_id"] == 900

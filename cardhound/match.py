@@ -77,6 +77,27 @@ def card_numbers(cards: str) -> set[str]:
     return out
 
 
+# A card number written on its own in a title: "#023", "(023)", " 023 ". Only zero-led numbers, so a
+# grade, a pop count or a "/250" serial is never read as one.
+BARE_NO = re.compile(r"(?<![\w/.-])#?(0\d{2})(?![\w/])")
+
+
+def print_of(w: dict) -> tuple[str, str] | None:
+    """(card number, star bucket) when the want is exactly one print, e.g. ("012", "2") for
+    "UE09BT/FMA-1-012_p1 SR★★"; the bucket is "-" for a print with no stars (a promo)."""
+    found = PRINT_ID.findall(w.get("cards") or "")
+    if len(found) != 1:
+        return None
+    m = re.search(PRINT_ID.pattern + r"\s+([A-Z]{1,3})(★*)", w["cards"])
+    star = str(len(m.group(4))) if m and m.group(4) else "-"
+    return found[0][1].split("-")[-1].split("_")[0].upper(), star
+
+
+def comp_id(w: dict) -> int:
+    """The want id sold comps are kept under: a split print shares its family's comps."""
+    return int(w.get("family") or w["_id"])
+
+
 US_ZIP = "97035"  # the Oregon forwarding address: eBay prices shipping and eligibility for it
 
 
@@ -135,6 +156,13 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
         listed = card_numbers(w["cards"])
         if seen and listed and not seen & listed:  # no readable numbers: no check
             return False
+        one = print_of(w)
+        if one:  # a single print: a bare number or a star count in the title must agree too
+            bare = set(BARE_NO.findall(title)) if not seen else set()
+            if bare and one[0] not in bare:
+                return False
+            if stars(title) not in ("-", one[1]):
+                return False
     if FOREIGN.search(t) or FOREIGN_SELLER.search(text):
         return False
     if w.get("set") == "DBS" and re.search(r"signed|autograph|\bauto\b|sabat|schemmel|nadolny", t):
