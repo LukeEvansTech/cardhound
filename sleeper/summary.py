@@ -30,7 +30,8 @@ MAX_CARDS = 40  # per email; the rest are a link to the Deals page
 def gather(db: DB, s: Settings, now: dt.datetime | None = None) -> dict:
     """What a summary would say right now; ``last_run`` is where the next one starts."""
     now = now or dt.datetime.now()
-    newest = db.one("SELECT max(id) AS id FROM runs")
+    # only finished runs: a running sweep may not have recorded its alerts yet
+    newest = db.one("SELECT max(id) AS id FROM runs WHERE status != 'running'")
     last_run = int(newest["id"] or 0) if newest else 0
     after = db.get(LAST_RUN, None)
     if after is None:  # first summary: the last day's runs
@@ -49,12 +50,16 @@ def gather(db: DB, s: Settings, now: dt.datetime | None = None) -> dict:
         if not w:
             continue
         r = dict(row)
+        if (json.loads(r["art"]) if r["art"] else {}).get("verdict") == "differs":
+            continue  # the photo shows another print: alerts withhold these too
         r["want"] = w
         r["v"] = sweep.verdict_for(db, s, r, w, cmp, pop)
         live.append(r)
     alerted = {
         (a["item_id"], a["kind"])
-        for a in db.all("SELECT item_id, kind FROM run_alerts WHERE run_id > ?", after)
+        for a in db.all(
+            "SELECT item_id, kind FROM run_alerts WHERE run_id > ? AND run_id <= ?", after, last_run
+        )
     }
 
     def best(r: dict) -> tuple:
@@ -76,7 +81,7 @@ def gather(db: DB, s: Settings, now: dt.datetime | None = None) -> dict:
         last_run,
     )
     # a broken sweep or alert is a problem; a few failed searches are noise, retried next sweep
-    bad = sum(1 for r in runs if r["status"] != "success" or r["alerts"].startswith("failed"))
+    bad = sum(1 for r in runs if r["status"] != "success" or "failed" in r["alerts"])
     return {
         "now": now,
         "new_graded": [r for r in new if r["kind"] == "psa"],

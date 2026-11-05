@@ -140,3 +140,21 @@ def test_summary_off_without_settings(tmp_path, monkeypatch):
     page = client.get("/summary")
     assert page.status_code == 200 and "The daily email is off" in page.text
     assert client.post("/summary/send").status_code == 409
+
+
+def test_running_sweeps_and_photo_mismatches_are_left_out(env):
+    s, db, _ = env
+    baseline(db, s, [row("1", 700)])
+    sweep_with(db, s, [row("1", 700), row("2", 650), row("3", 640)])
+    db.run("UPDATE listings SET art = ? WHERE item_id = '3'", '{"verdict": "differs"}')
+    running = db.run("INSERT INTO runs (status) VALUES ('running')")
+    g = summary.gather(db, s)
+    assert [r["item_id"] for r in g["new_graded"]] == ["2"]
+    assert g["last_run"] < running
+
+
+def test_a_failed_baseline_alert_counts_as_a_problem(env):
+    s, db, _ = env
+    baseline(db, s, [row("1", 700)])
+    db.run("INSERT INTO runs (status, alerts) VALUES ('success', 'baseline failed: TimeoutError')")
+    assert summary.gather(db, s)["bad_runs"] == 1
