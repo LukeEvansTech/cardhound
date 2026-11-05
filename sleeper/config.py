@@ -68,7 +68,8 @@ def load() -> Settings:
         d.mkdir(parents=True, exist_ok=True)
     old = s.data_dir / "cardhound.db"  # the app was called cardhound until 2026-11-05
     if old.exists() and not s.db_path.exists():
-        for suffix in ("", "-wal", "-shm"):
+        # sidecars first, the database last: an interrupted move resumes on the next start
+        for suffix in ("-wal", "-shm", ""):
             src = old.with_name(old.name + suffix)
             if src.exists():
                 src.rename(s.db_path.with_name(s.db_path.name + suffix))
