@@ -109,6 +109,19 @@ def test_search_pages_filters_and_sends_location():
     assert len(search) == 2
     assert "zip%3D97035" in search[0].get_header("X-ebay-c-enduserctx")
     assert "-psa" not in search[0].full_url
+    assert "AUCTION" in urllib.parse.unquote(search[0].full_url)
+
+
+def test_a_failed_later_page_fails_the_search():
+    pages = [{"total": 250, "itemSummaries": [item(i, f"Aki SR {i}") for i in range(200)]}]
+
+    class SecondPageDown(FakeHTTP):
+        def __call__(self, req):
+            if "offset=200" in req.full_url:
+                return 503, b"{}"
+            return super().__call__(req)
+
+    assert api(SecondPageDown(pages)).search(match.search_url("aki")) is None
 
 
 def test_sold_search_is_empty_without_a_call():

@@ -218,11 +218,12 @@ class BrowseAPI:
                 "limit": str(PAGE),
                 "offset": str(offset),
                 "sort": "price",
-                "filter": "deliveryCountry:US",
+                # Without buyingOptions the API returns fixed-price listings only.
+                "filter": "deliveryCountry:US,buyingOptions:{FIXED_PRICE|AUCTION}",
             }
             got = self._get("/buy/browse/v1/item_summary/search", params, p.get("_stpos", ""))
-            if got is None:
-                return out or None
+            if got is None:  # a partial result would retire the listings on the missing page
+                return None
             items = got.get("itemSummaries") or []
             out += [r for r in map(row, items) if r]
             if offset + PAGE >= int(got.get("total") or 0) or not items:
