@@ -1,17 +1,29 @@
 {% extends "base.html" %}
 {% block title %}{{ w.who or 'Add card' }} · sleeper{% endblock %}
 {% block body %}
+{% set ua = w.set in ['FMA', 'EVA', 'CSM', 'AOT'] %}
+{% set kept = art | selectattr('kept') | list %}
+<div class="want-page">
+<aside class="want-art">
+  {% if kept or art %}<img src="/refs/{{ (kept or art)[0].name }}" alt="Official art for {{ w.who }}">{% else %}<span class="noart">{{ w.set or 'New card' }}</span>{% endif %}
+  {% if w._id %}<p><a href="/?want={{ w._id }}&amp;show=all">See its live listings</a></p>{% endif %}
+</aside>
+<div>
 <h1>{{ w.who or 'Add a card to watch' }}</h1>
-{% if error %}<p class="warn">{{ error }}</p>{% endif %}
+{% if art | length == 1 %}<p class="muted">Watching the {{ art[0].label }}</p>{% endif %}
+{% if error %}<p class="warn" role="alert">{{ error }}</p>{% endif %}
 <form method="post" action="/wants" class="want-form">
   {% if w._id %}<input type="hidden" name="_id" value="{{ w._id }}">{% endif %}
   <label>Card name <input name="who" value="{{ w.who or '' }}" required placeholder="Vegito SPR signature"></label>
   <label>Set or game tag <input name="set" value="{{ w.set or '' }}" required placeholder="DBS, FIN, FMA, EVA, CSM, AOT…">
     <small>FMA, EVA, CSM and AOT build Union Arena searches from the card name. Anything else needs a search below.</small></label>
+  <details class="more" {{ 'open' if not ua or w.q or w.rawq or w.id or w.need }}><summary>{{ 'Custom eBay search' if ua else 'eBay search' }}</summary>
+  {% if ua %}<small>Union Arena cards build their searches from the card name; fill these only to override that.</small>{% endif %}
   <label>eBay search for PSA 10s <input name="q" value="{{ w.q or '' }}" placeholder="vegito bt7-118 psa 10"></label>
   <label>eBay search for raw copies <input name="rawq" value="{{ w.rawq or '' }}" placeholder="optional"></label>
   <label>Title must match (regex) <input name="id" value="{{ w.id or '' }}" placeholder="bt7-118|vegito"></label>
   <label>Title must also match (regex) <input name="need" value="{{ w.need or '' }}" placeholder="optional"></label>
+  </details>
   <fieldset><legend>PSA 10 ceiling (USD, landed)</legend>
     {% for b in ['1', '2', '3', 'any'] %}<label class="mini">{{ b | star or 'any' }} <input name="max_{{ b }}" inputmode="decimal" value="{{ (w.max or {}).get(b, '') }}"></label>{% endfor %}
   </fieldset>
@@ -19,7 +31,7 @@
     {% for b in ['1', '2', '3', 'any'] %}<label class="mini">{{ b | star or 'any' }} <input name="rawmax_{{ b }}" inputmode="decimal" value="{{ (w.rawmax or {}).get(b, '') }}"></label>{% endfor %}
   </fieldset>
   <label>Card numbers <input name="cards" value="{{ w.cards or '' }}" placeholder="011, 012 (1★, 2★)"></label>
-  {% if art %}
+  {% if art | length > 1 %}
   <fieldset class="art-pick"><legend>Which of these arts do you want?</legend>
     <small>Untick an art and listings whose photo matches it stop counting as deals. A photo that also matches an art you kept still counts, so use the star ceilings above to choose between near-identical versions.</small>
     <div class="art-grid">
@@ -30,6 +42,8 @@
     {% endfor %}
     </div>
   </fieldset>
+  {% elif art %}
+  {% for a in art %}{% if a.kept %}<input type="hidden" name="keep" value="{{ a.name }}">{% endif %}<input type="hidden" name="art_all" value="{{ a.name }}">{% endfor %}
   {% endif %}
   <label>Official art files <input name="refs" value="{{ (w.refs or []) | join(', ') }}" placeholder="filenames in /api/refs"></label>
   <label>Notes <input name="notes" value="{{ w.notes or '' }}"></label>
@@ -38,12 +52,14 @@
     <textarea name="extra" rows="8">{{ extra }}</textarea>
     <small>Other keys: match, raw (false skips raw), nostar, needstar, raw_max, pop {term,row}, skip (unticked arts).</small>
   </details>
-  <div class="actions"><button class="primary">Save</button></div>
+  <div class="actions">
+    <button class="primary">Save changes</button>
+    {% if w._id %}
+    <button formaction="/wants/{{ w._id }}/sweep" formnovalidate>Search this card now</button>
+    <button class="danger push" formaction="/wants/{{ w._id }}/delete" formnovalidate onclick="return confirm('Delete this want and its listings?')">Delete want</button>
+    {% endif %}
+  </div>
 </form>
-{% if w._id %}
-<div class="actions">
-  <form method="post" action="/wants/{{ w._id }}/sweep"><button>Search this card now</button></form>
-  <form method="post" action="/wants/{{ w._id }}/delete" onsubmit="return confirm('Delete this want and its listings?')"><button class="danger">Delete</button></form>
 </div>
-{% endif %}
+</div>
 {% endblock %}

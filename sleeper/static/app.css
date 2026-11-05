@@ -1,14 +1,15 @@
 /*
- * Sleeper: a grading-desk look. Cards sit in slab-like frames with a label band (name and set on
+ * Sleeper: a grading-desk look, set in Archivo (a sturdy grotesque with a width axis, like the
+ * type on slab labels and price cards). Cards sit in slab-like frames with a label band (name and set on
  * the left, the landed price in the grade box on the right). The one loud thing is the foil edge
  * on a great deal; everything else stays quiet. Light is toploader grey, dark is binder navy.
  */
 
 @font-face {
-  font-family: "Mona Sans";
-  src: url("/static/fonts/MonaSans-VF.woff2") format("woff2");
+  font-family: Archivo;
+  src: url("/static/fonts/Archivo-VF.woff2") format("woff2");
   font-weight: 200 900;
-  font-stretch: 75% 125%;
+  font-stretch: 62% 125%;
   font-display: swap;
 }
 
@@ -103,7 +104,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Mona Sans", system-ui, sans-serif;
+  font-family: Archivo, system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.5;
   font-optical-sizing: auto;
@@ -141,10 +142,16 @@ h2 {
   text-wrap: balance;
 }
 
+/* Prices and counts line up in columns; numeric columns right-align. */
+.price,
 .num,
-td,
-.price {
+td {
   font-variant-numeric: tabular-nums;
+}
+
+th.n,
+td.n {
+  text-align: right;
 }
 
 main {
@@ -795,7 +802,88 @@ tr.off td {
   text-decoration: none;
 }
 
+/* --- runs page settings --- */
+
+.settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px 24px;
+  margin: 8px 0 18px;
+}
+
+.settings dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.settings dd {
+  margin: 2px 0 0;
+}
+
+.advice .badge {
+  vertical-align: 0.1em;
+  margin-right: 6px;
+}
+
 /* --- want form --- */
+
+.want-page {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 680px);
+  gap: 32px;
+  align-items: start;
+}
+
+.want-art {
+  position: sticky;
+  top: 84px;
+}
+
+.want-art img,
+.want-art .noart {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+  padding: 10px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-weight: 800;
+  font-stretch: 125%;
+}
+
+.want-form .more {
+  display: grid;
+  gap: 14px;
+}
+
+.want-form .more[open] {
+  padding-bottom: 4px;
+}
+
+.want-form summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.actions .push {
+  margin-left: auto;
+}
+
+@media (width <= 760px) {
+  .want-page {
+    grid-template-columns: 1fr;
+  }
+
+  .want-art {
+    position: static;
+    max-width: 200px;
+  }
+}
 
 .want-form {
   display: grid;
