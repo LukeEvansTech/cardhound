@@ -163,3 +163,19 @@ def test_keyset_switches_the_sweep_to_the_api(tmp_path, monkeypatch):
     monkeypatch.setenv("EBAY_CLIENT_ID", "id")
     monkeypatch.setenv("EBAY_CLIENT_SECRET", "secret")
     assert isinstance(sweep.default_source(config.load()), BrowseAPI)
+
+
+def test_incomplete_or_bad_searches_fail():
+    lots = {"total": 5000, "itemSummaries": [item(i, f"Cloud lot {i}") for i in range(200)]}
+    assert api(FakeHTTP([lots] * 10)).search(match.search_url("cloud -lot")) is None
+    assert api(FakeHTTP([])).search(match.search_url("x" * 120)) is None
+    bad = FakeHTTP([{"total": 0, "itemSummaries": []}])
+    real = bad.__call__
+    bad_json = iter([b"not json"])
+
+    def flaky(req):
+        if "item_summary" in req.full_url and (body := next(bad_json, None)):
+            return 200, body
+        return real(req)
+
+    assert api(flaky).search(match.search_url("aki")) == []

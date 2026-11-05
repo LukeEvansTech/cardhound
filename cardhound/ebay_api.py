@@ -70,7 +70,7 @@ def split_query(q: str) -> tuple[str, list[str]]:
             drop += [x.strip().strip('"').lower() for x in parts if x.strip().strip('"')]
         else:
             keep.append(word)
-    return " ".join(keep)[:Q_MAX].strip(), drop
+    return " ".join(keep).strip(), drop
 
 
 def _money(amount: dict | None) -> float | None:
@@ -189,11 +189,11 @@ class BrowseAPI:
                     ctx = urllib.parse.quote(f"country=US,zip={zip_code}")
                     headers["X-EBAY-C-ENDUSERCTX"] = f"contextualLocation={ctx}"
                 status, raw = self._fetch(urllib.request.Request(url, headers=headers))
+                if status == 200:
+                    return json.loads(raw)
             except Exception as e:  # pylint: disable=broad-exception-caught
                 log.debug("browse api attempt %d failed: %s", attempt, type(e).__name__)
-                status, raw = 0, b""
-            if status == 200:
-                return json.loads(raw)
+                status = 0
             if status == 401:
                 self._token = ""  # expired or revoked: fetch a new one on the next try
             elif 400 <= status < 500 and status != 429:
@@ -213,6 +213,9 @@ class BrowseAPI:
         q, drop = split_query(p.get("_nkw", ""))
         if not q:
             return []
+        if len(q) > Q_MAX:  # eBay would cut it, dropping terms; fail rather than search wrongly
+            log.warning("query over %d characters for the Browse API: %s", Q_MAX, q)
+            return None
         excluded = (
             re.compile(r"\b(" + "|".join(map(re.escape, drop)) + r")\b", re.I) if drop else None
         )
@@ -236,6 +239,8 @@ class BrowseAPI:
             ]
             if len(out) >= MAX_ROWS or offset + PAGE >= int(got.get("total") or 0) or not items:
                 break
+        else:  # page limit hit with results left: incomplete, so leave tracked listings alone
+            return None
         return out[:MAX_ROWS]
 
     def item_photos(self, item_id: str) -> list[str]:
