@@ -14,6 +14,7 @@ JPEG = b"\xff\xd8\xff\xe0" + b"0" * 200
 class FakeSMTP:
     sent: list = []
     fail = False
+    refused: dict = {}
 
     def __init__(self, host, *_args, **_kw):
         self.host = host
@@ -34,6 +35,7 @@ class FakeSMTP:
         if FakeSMTP.fail:
             raise smtplib.SMTPRecipientsRefused({})
         FakeSMTP.sent.append(msg)
+        return FakeSMTP.refused
 
 
 @pytest.fixture
@@ -46,7 +48,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(summary.smtplib, "SMTP", FakeSMTP)
     monkeypatch.setattr(summary, "_thumb", lambda url: JPEG)
     monkeypatch.setattr(sweep.notify, "send", lambda *a, **k: "sent")
-    FakeSMTP.sent, FakeSMTP.fail = [], False
+    FakeSMTP.sent, FakeSMTP.fail, FakeSMTP.refused = [], False, {}
     s = config.load()
     db = DB(s.db_path)
     client = TestClient(create_app(s, db))
@@ -217,3 +219,12 @@ def test_a_sweep_that_never_ends_fails_the_summary_loudly(env, monkeypatch):
     monkeypatch.setattr(summary, "_settled", lambda *_a, **_k: None)
     assert summary.run(db, s, lambda g, img: ("x", "x")).startswith("failed")
     assert "failed" in db.get("summary_last_result", "")
+
+
+def test_a_partly_refused_send_is_not_a_success(env):
+    s, db, _ = env
+    baseline(db, s, [row("1", 700)])
+    sweep_with(db, s, [row("1", 700), row("2", 650)])
+    FakeSMTP.refused = {"b@example.com": (550, b"no such user")}
+    assert summary.run(db, s, lambda g, img: ("x", "x")).startswith("failed")
+    assert db.get(summary.LAST_RUN, None) == 1

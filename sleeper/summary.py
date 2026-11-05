@@ -47,7 +47,9 @@ def gather(db: DB, s: Settings, now: dt.datetime | None = None) -> dict:
             day_ago = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
-            first = db.one("SELECT min(id) AS id FROM runs WHERE started >= ?", day_ago)
+            first = db.one(
+                "SELECT min(id) AS id FROM runs WHERE coalesce(finished, started) >= ?", day_ago
+            )
             after = (first["id"] - 1) if first and first["id"] else last_run
             db.put(FIRST_FROM, after)
     after = int(after)
@@ -169,10 +171,12 @@ def send(s: Settings, g: dict, render) -> str:
             if smtp.has_extn("starttls"):
                 smtp.starttls(context=ssl.create_default_context())
                 smtp.ehlo()
-            smtp.send_message(msg)
+            refused = smtp.send_message(msg)
     except (OSError, smtplib.SMTPException) as e:
         log.warning("summary email failed: %s", type(e).__name__)
         return f"failed: {type(e).__name__}"
+    if refused:  # some recipients accepted, some not: retry them all next time
+        return f"failed: {len(refused)} recipient(s) refused"
     return "sent"
 
 
