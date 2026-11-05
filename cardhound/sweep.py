@@ -148,12 +148,17 @@ def assign(db: DB, found: list[dict], wants: dict[int, dict]) -> dict[tuple[str,
     for r in db.all("SELECT item_id, kind, want_id, art FROM listings WHERE art IS NOT NULL"):
         if json.loads(r["art"]).get("verdict") == "match":
             matched[(r["item_id"], r["kind"])] = r["want_id"]
-    live = {x["_id"] for x in db.wants()}
+    live = {x["_id"]: x for x in db.wants()}
     out = {}
     for key, fs in cands.items():
         fs = [f for f in fs if f["want_id"] in wants] or fs
         m = matched.get(key)
-        if m is not None and m in live and m not in wants:
+        if (
+            m is not None
+            and m in live
+            and m not in wants
+            and match.keep(live[m], fs[0]["kind"], fs[0]["title"], fs[0]["title"])
+        ):
             continue  # its photo placed it on a print this sweep didn't search; leave it there
         ranked = sorted(
             (fit(f, wants.get(f["want_id"], {"_id": f["want_id"]}), m), i) for i, f in enumerate(fs)
