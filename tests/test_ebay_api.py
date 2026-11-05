@@ -63,6 +63,8 @@ def test_split_query_moves_exclusions_out():
     assert drop == ["psa", "bgs", "cgc", "tag"]
     q, drop = split_query('card psa 10 -"first edition" -jp')
     assert q == "card psa 10" and drop == ["first edition", "jp"]
+    q, drop = split_query("cloud psa 10 -(lot, bundle) (sr,sec)")
+    assert q == "cloud psa 10 (sr,sec)" and drop == ["lot", "bundle"]
 
 
 def test_row_reads_like_a_search_card():
@@ -125,6 +127,13 @@ def test_a_failed_later_page_fails_the_search():
 
     assert api(SecondPageDown(pages)).search(match.search_url("aki")) is None
     assert api(FakeHTTP([], statuses=[404])).search(match.search_url("aki")) is None
+
+
+def test_row_cap_counts_rows_left_after_exclusions():
+    lots = {"total": 1000, "itemSummaries": [item(i, f"Cloud lot {i}") for i in range(200)]}
+    keep = {"total": 1000, "itemSummaries": [item(900 + i, f"Cloud {i}") for i in range(200)]}
+    rows = api(FakeHTTP([lots, lots, keep, {"total": 1000}])).search(match.search_url("cloud -lot"))
+    assert len(rows) == 200 and rows[0]["id"] == "900"
 
 
 def test_sold_search_is_empty_without_a_call():

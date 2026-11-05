@@ -29,6 +29,7 @@ API = "https://api.ebay.com"
 SCOPE = "https://api.ebay.com/oauth/api_scope"
 PAGE = 200  # the Browse API's maximum page size
 MAX_ROWS = 400
+MAX_PAGES = 10
 Q_MAX = 100  # longer q strings are truncated by eBay
 # ISO codes for the seller countries match.FOREIGN_SELLER rejects, in the words a search card uses.
 COUNTRIES = {
@@ -61,11 +62,12 @@ def _fetch(req: urllib.request.Request) -> tuple[int, bytes]:
 def split_query(q: str) -> tuple[str, list[str]]:
     """eBay website query -> (Browse API q, excluded words)."""
     keep, drop = [], []
-    for word in re.findall(r'-?"[^"]*"|\S+', q):  # a quoted phrase is one term
+    # A quoted phrase or a parenthesised (a,b) group is one term.
+    for word in re.findall(r'-?"[^"]*"|-?\([^)]*\)|\S+', q):
         if word.startswith("-") and len(word) > 1:
-            phrase = word[1:].strip('"').lower()
-            if phrase:
-                drop.append(phrase)
+            body = word[1:]
+            parts = body[1:-1].split(",") if body.startswith("(") else [body]
+            drop += [x.strip().strip('"').lower() for x in parts if x.strip().strip('"')]
         else:
             keep.append(word)
     return " ".join(keep)[:Q_MAX].strip(), drop
@@ -211,8 +213,12 @@ class BrowseAPI:
         q, drop = split_query(p.get("_nkw", ""))
         if not q:
             return []
+        excluded = (
+            re.compile(r"\b(" + "|".join(map(re.escape, drop)) + r")\b", re.I) if drop else None
+        )
         out: list[dict] = []
-        for offset in range(0, MAX_ROWS, PAGE):
+        # The row cap counts kept rows, as on the website where eBay applied exclusions itself.
+        for offset in range(0, MAX_PAGES * PAGE, PAGE):
             params = {
                 "q": q,
                 "limit": str(PAGE),
@@ -225,13 +231,12 @@ class BrowseAPI:
             if got is None:  # a partial result would retire the listings on the missing page
                 return None
             items = got.get("itemSummaries") or []
-            out += [r for r in map(row, items) if r]
-            if offset + PAGE >= int(got.get("total") or 0) or not items:
+            out += [
+                r for r in map(row, items) if r and not (excluded and excluded.search(r["title"]))
+            ]
+            if len(out) >= MAX_ROWS or offset + PAGE >= int(got.get("total") or 0) or not items:
                 break
-        if drop:
-            pat = re.compile(r"\b(" + "|".join(map(re.escape, drop)) + r")\b", re.I)
-            out = [r for r in out if not pat.search(r["title"])]
-        return out
+        return out[:MAX_ROWS]
 
     def item_photos(self, item_id: str) -> list[str]:
         """Full-size photo URLs for a listing, gallery order."""
