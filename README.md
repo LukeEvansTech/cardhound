@@ -9,7 +9,7 @@ buy the slab, buy raw and grade, or pass.
 ## How it works
 
 ```text
-sweep (cron) ─▶ eBay search per want (headless Chromium) ─▶ listings
+sweep (cron) ─▶ eBay search per want (Browse API or headless Chromium) ─▶ listings
               ─▶ ceiling + comps + gem rate ─▶ verdict per listing
               ─▶ photo check against the official art (OpenCV ORB)
               ─▶ alert each new deal (Apprise), deal page per alert
@@ -28,6 +28,10 @@ sweep (cron) ─▶ eBay search per want (headless Chromium) ─▶ listings
   card, kind (PSA 10 or raw) and star bucket, plus the cost of one PSA 10 by grading a raw copy:
   `(raw price + grading fee + shipping) / gem rate`. The gem rate is the card's own PSA pop when 10
   or more have been graded, otherwise the set's.
+- **Search source**: with `EBAY_CLIENT_ID` and `EBAY_CLIENT_SECRET` set (a production keyset from
+  the eBay developer console), searches and listing photos go through the Browse API; without
+  them, through headless Chromium. The Browse API query has no `-word` exclusion, so excluded words are
+  matched against titles instead, and it has no sold search.
 - **Sold comps**: eBay sends signed-out sold searches to a sign-in page, so sold prices are posted
   to `POST /api/sold` by a signed-in browser elsewhere.
 - **Alerts**: the first sweep records a baseline and sends one summary. After that each new deal
@@ -52,17 +56,19 @@ uid 65532 and works with a read-only root filesystem as long as `/tmp` is writab
 
 ## Configuration
 
-| Variable                     | Default             | Description                                                        |
-| ---------------------------- | ------------------- | ------------------------------------------------------------------ |
-| `CARDHOUND_DATA`             | `data`              | Directory for `cardhound.db`, official art (`refs/`) and photos.   |
-| `CARDHOUND_PUBLIC_URL`       | none                | Base URL of the web UI; alert links are absolute when set.         |
-| `CARDHOUND_SCHEDULE`         | `0 2,8,14,20 * * *` | Cron for the in-process sweep.                                     |
-| `CARDHOUND_TZ`               | `Europe/London`     | Timezone the schedule is read in.                                  |
-| `APPRISE_URLS`               | none                | Comma-separated Apprise URLs. Empty sends nothing.                 |
-| `CARDHOUND_ALERT_INDIVIDUAL` | `5`                 | Deals per sweep that get their own alert; the rest share a digest. |
-| `CARDHOUND_GRADING_FEE`      | `39.99`             | PSA fee per card, USD.                                             |
-| `CARDHOUND_GRADING_SHIP`     | `6`                 | Return shipping per card, USD.                                     |
-| `CARDHOUND_TRIES`            | `8`                 | Page loads per search before it counts as failed.                  |
+| Variable                     | Default             | Description                                                            |
+| ---------------------------- | ------------------- | ---------------------------------------------------------------------- |
+| `CARDHOUND_DATA`             | `data`              | Directory for `cardhound.db`, official art (`refs/`) and photos.       |
+| `CARDHOUND_PUBLIC_URL`       | none                | Base URL of the web UI; alert links are absolute when set.             |
+| `CARDHOUND_SCHEDULE`         | `0 2,8,14,20 * * *` | Cron for the in-process sweep.                                         |
+| `CARDHOUND_TZ`               | `Europe/London`     | Timezone the schedule is read in.                                      |
+| `APPRISE_URLS`               | none                | Comma-separated Apprise URLs. Empty sends nothing.                     |
+| `CARDHOUND_ALERT_INDIVIDUAL` | `5`                 | Deals per sweep that get their own alert; the rest share a digest.     |
+| `CARDHOUND_GRADING_FEE`      | `39.99`             | PSA fee per card, USD.                                                 |
+| `CARDHOUND_GRADING_SHIP`     | `6`                 | Return shipping per card, USD.                                         |
+| `CARDHOUND_TRIES`            | `8`                 | Page loads per search before it counts as failed.                      |
+| `EBAY_CLIENT_ID`             | none                | Browse API App ID. With the secret, replaces the browser for searches. |
+| `EBAY_CLIENT_SECRET`         | none                | Browse API Cert ID.                                                    |
 
 ## API
 

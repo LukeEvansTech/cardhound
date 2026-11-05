@@ -12,12 +12,26 @@ import json
 import logging
 import re
 import threading
-from typing import Callable
+from typing import Callable, Protocol
 
 from . import match, notify, photos, value
 from .config import Settings
 from .db import DB
 from .ebay import Browser
+from .ebay_api import BrowseAPI
+
+
+class Source(Protocol):
+    """Where searches go: the headless browser or the Browse API (same URLs in, same rows out)."""
+
+    def __enter__(self) -> "Source": ...
+
+    def __exit__(self, *exc: object) -> None: ...
+
+    def search(self, url: str) -> list[dict] | None: ...
+
+    def item_photos(self, item_id: str) -> list[str]: ...
+
 
 log = logging.getLogger(__name__)
 LOCK = threading.Lock()
@@ -31,7 +45,7 @@ def _sold_date(text: str, today: str) -> str:
     return dt.datetime.strptime(m.group(1), "%b %d, %Y").date().isoformat()
 
 
-def collect(b: Browser, w: dict, blocked: set[str], defaults: dict, today: str, sold_too: bool):
+def collect(b: Source, w: dict, blocked: set[str], defaults: dict, today: str, sold_too: bool):
     """(listings, sold, ok_kinds, failed_kinds) for one want."""
     found, sold, ok, failed = [], [], [], []
     for kind, q in match.searches(w):
@@ -136,9 +150,7 @@ def retire_unsearched(db: DB, w: dict) -> None:
     )
 
 
-def photo_check(
-    db: DB, s: Settings, b: Browser | None, wants: dict[int, dict], run_id: int
-) -> None:
+def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], run_id: int) -> None:
     """Score each live deal's photo against the official art, once per listing."""
     rows = db.all(
         "SELECT item_id, kind, want_id, img, art FROM listings WHERE active = 1 AND deal = 1 "
@@ -398,6 +410,13 @@ def import_sold(db: DB, sold: dict) -> int:
         return c.total_changes - before
 
 
+def default_source(s: Settings) -> Source:
+    """The Browse API when a keyset is configured, otherwise headless Chromium."""
+    if s.ebay_api:
+        return BrowseAPI(s.ebay_client_id, s.ebay_client_secret)
+    return Browser(headless=s.headless, tries=s.fetch_tries)
+
+
 def run(
     db: DB,
     s: Settings,
@@ -405,7 +424,7 @@ def run(
     only: str = "",
     notify_on: bool = True,
     want_ids: list[int] | None = None,
-    browser: Callable[[], Browser] | None = None,
+    browser: Callable[[], Source] | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> int:
     """Run one sweep; returns the run id. Refuses (returns 0) while another sweep is running."""
@@ -439,8 +458,8 @@ def run(
         today = dt.date.today().isoformat()
         found, sold, searched, failed = [], [], [], []
         n = 0
-        factory = browser or (lambda: Browser(headless=s.headless, tries=s.fetch_tries))
-        with factory() as b:
+        say(f"source: {'eBay Browse API' if s.ebay_api and not browser else 'browser'}")
+        with (browser or (lambda: default_source(s)))() as b:
             for i, w in enumerate(wants, 1):
                 f, so, ok, bad = collect(b, w, blocked, defaults, today, s.ebay_sold)
                 n += len(ok) + len(bad)

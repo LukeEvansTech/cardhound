@@ -35,8 +35,18 @@ class Settings:
     ebay_sold: bool = field(
         default_factory=lambda: os.environ.get("CARDHOUND_EBAY_SOLD", "0") == "1"
     )
+    # Browse API keyset (production, client credentials). When both are set the sweep searches
+    # through the API instead of headless Chromium.
+    ebay_client_id: str = field(default_factory=lambda: os.environ.get("EBAY_CLIENT_ID", ""))
+    ebay_client_secret: str = field(
+        default_factory=lambda: os.environ.get("EBAY_CLIENT_SECRET", "")
+    )
     headless: bool = field(default_factory=lambda: os.environ.get("CARDHOUND_HEADLESS", "1") != "0")
     version: str = field(default_factory=lambda: os.environ.get("APP_VERSION", "0.0.0-dev"))
+
+    @property
+    def ebay_api(self) -> bool:
+        return bool(self.ebay_client_id and self.ebay_client_secret)
 
     @property
     def db_path(self) -> Path:
