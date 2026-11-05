@@ -32,9 +32,7 @@ class Settings:
     fetch_tries: int = field(default_factory=lambda: int(os.environ.get("SLEEPER_TRIES", "8")))
     # eBay sends signed-out sold searches to sign-in and a captcha, so sold comps arrive through
     # POST /api/sold from a signed-in browser instead. Set SLEEPER_EBAY_SOLD=1 to try anyway.
-    ebay_sold: bool = field(
-        default_factory=lambda: os.environ.get("SLEEPER_EBAY_SOLD", "0") == "1"
-    )
+    ebay_sold: bool = field(default_factory=lambda: os.environ.get("SLEEPER_EBAY_SOLD", "0") == "1")
     # Browse API keyset (production, client credentials). When both are set the sweep searches
     # through the API instead of headless Chromium.
     ebay_client_id: str = field(default_factory=lambda: os.environ.get("EBAY_CLIENT_ID", ""))

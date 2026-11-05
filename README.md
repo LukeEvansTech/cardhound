@@ -61,19 +61,19 @@ uid 65532 and works with a read-only root filesystem as long as `/tmp` is writab
 
 ## Configuration
 
-| Variable                     | Default             | Description                                                            |
-| ---------------------------- | ------------------- | ---------------------------------------------------------------------- |
-| `SLEEPER_DATA`             | `data`              | Directory for `sleeper.db`, official art (`refs/`) and photos.       |
+| Variable                   | Default             | Description                                                            |
+| -------------------------- | ------------------- | ---------------------------------------------------------------------- |
+| `SLEEPER_DATA`             | `data`              | Directory for `sleeper.db`, official art (`refs/`) and photos.         |
 | `SLEEPER_PUBLIC_URL`       | none                | Base URL of the web UI; alert links are absolute when set.             |
 | `SLEEPER_SCHEDULE`         | `0 2,8,14,20 * * *` | Cron for the in-process sweep.                                         |
 | `SLEEPER_TZ`               | `Europe/London`     | Timezone the schedule is read in.                                      |
-| `APPRISE_URLS`               | none                | Comma-separated Apprise URLs. Empty sends nothing.                     |
+| `APPRISE_URLS`             | none                | Comma-separated Apprise URLs. Empty sends nothing.                     |
 | `SLEEPER_ALERT_INDIVIDUAL` | `5`                 | Deals per sweep that get their own alert; the rest share a digest.     |
 | `SLEEPER_GRADING_FEE`      | `39.99`             | PSA fee per card, USD.                                                 |
 | `SLEEPER_GRADING_SHIP`     | `6`                 | Return shipping per card, USD.                                         |
 | `SLEEPER_TRIES`            | `8`                 | Page loads per search before it counts as failed.                      |
-| `EBAY_CLIENT_ID`             | none                | Browse API App ID. With the secret, replaces the browser for searches. |
-| `EBAY_CLIENT_SECRET`         | none                | Browse API Cert ID.                                                    |
+| `EBAY_CLIENT_ID`           | none                | Browse API App ID. With the secret, replaces the browser for searches. |
+| `EBAY_CLIENT_SECRET`       | none                | Browse API Cert ID.                                                    |
 
 ## API
 
@@ -83,6 +83,6 @@ uid 65532 and works with a read-only root filesystem as long as `/tmp` is writab
 | `POST /api/sold`       | `{sold: {item_id: {set, who, kind, star, usd, date, title}}}`.                            |
 | `PUT /api/refs/<name>` | Upload one official-art image (JPEG or PNG).                                              |
 | `GET /health`          | Process is up.                                                                            |
-| `GET /metrics`         | `sleeper_last_success_timestamp_seconds` and friends, for alerting.                     |
+| `GET /metrics`         | `sleeper_last_success_timestamp_seconds` and friends, for alerting.                       |
 
 The UI has no login: run it behind an internal-only route.
