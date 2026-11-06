@@ -326,7 +326,7 @@ def slab_check(db: DB, s: Settings, run_id: int) -> int:
     dropped = 0
     for n, (_, _, r, art) in enumerate(due):
         if n >= MAX_SLAB_READS:
-            if r["deal"]:  # not read yet: no alert until it is
+            if r["deal"] and not r["slab"]:  # never read: no alert until it is
                 db.run(
                     "UPDATE listings SET deal = 0 WHERE item_id = ? AND kind = ?",
                     r["item_id"],
