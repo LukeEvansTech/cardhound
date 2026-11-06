@@ -285,38 +285,68 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
         )
 
 
-MAX_SLAB_READS = 40  # vision calls per sweep; the rest wait for the next one
+MAX_SLAB_READS = 60  # vision calls per sweep; the rest wait for the next one
+
+
+def _slab_due(r: dict, photo_name: str) -> str:
+    """Sort key for a listing whose slab is still to read ('' first), or '~' when it is done.
+    Unread first, then failed tries oldest first; an unsure read is read again once its photo changed.
+    """
+    v = json.loads(r["slab"]) if r["slab"] else None
+    if v is None:
+        return ""
+    if "failed" in v:
+        return v["failed"]
+    unsure = not v.get("sure") or v.get("grader") == "NONE"
+    return "0" if unsure and v.get("photo") != photo_name else "~"
 
 
 def slab_check(db: DB, s: Settings, run_id: int) -> int:
-    """Read the slab label of each live PSA 10 listing once; drop one that is another grader's slab
-    (a CGC 9 titled "PSA 10") or a lower PSA grade. Returns how many were dropped."""
+    """Read the slab label of each live PSA 10 listing; drop one that is another grader's slab
+    (a CGC 9 titled "PSA 10") or a lower PSA grade. Returns how many were dropped.
+
+    A deal whose slab could not be read this sweep (over the limit) is held out of this sweep's
+    alerts and rated again next sweep. A failed read is not held: an LLM outage must not stop alerts.
+    """
     if not s.llm_url:
         return 0
     rows = db.all(
-        "SELECT item_id, kind, img, art FROM listings WHERE kind = 'psa' AND active = 1 "
-        "AND last_run = ? AND slab IS NULL ORDER BY deal DESC LIMIT ?",
+        "SELECT item_id, kind, img, art, slab, deal FROM listings WHERE kind = 'psa' AND active = 1 "
+        "AND last_run = ?",
         run_id,
-        MAX_SLAB_READS,
     )
-    dropped = 0
+    due = []
     for r in rows:
         art = json.loads(r["art"]) if r["art"] else {}
+        key = _slab_due(r, art.get("photo") or "")
+        if key != "~":
+            due.append((0 if r["deal"] else 1, key, r, art))
+    due.sort(key=lambda x: (x[0], x[1]))
+    dropped = 0
+    for n, (_, _, r, art) in enumerate(due):
+        if n >= MAX_SLAB_READS:
+            if r["deal"]:  # not read yet: no alert until it is
+                db.run(
+                    "UPDATE listings SET deal = 0 WHERE item_id = ? AND kind = ?",
+                    r["item_id"],
+                    r["kind"],
+                )
+            continue
         photo = s.photos_dir / art["photo"] if art.get("photo") else None
         if not (photo and photo.exists()):
             photo = photos.download(photos.upgrade(r["img"]), s.photos_dir / f"{r['item_id']}.jpg")
-        if not photo:
-            continue
-        v = slab.read(s.llm_url, s.llm_key, s.llm_model, photo)
+        v = slab.read(s.llm_url, s.llm_key, s.llm_model, photo) if photo else None
         if v is None:
-            continue  # asked again next sweep
+            v = {"failed": dt.datetime.now().isoformat(timespec="seconds")}
+        else:
+            v["photo"] = art.get("photo") or ""
         db.run(
             "UPDATE listings SET slab = ? WHERE item_id = ? AND kind = ?",
             json.dumps(v),
             r["item_id"],
             r["kind"],
         )
-        why = slab.wrong(v)
+        why = slab.wrong(v) if "failed" not in v else ""
         if why:
             dropped += 1
             db.run(

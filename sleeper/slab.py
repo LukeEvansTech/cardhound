@@ -73,10 +73,13 @@ def as_jpeg(photo: Path) -> bytes | None:
     import cv2
     import numpy as np
 
-    img = cv2.imdecode(np.frombuffer(photo.read_bytes(), np.uint8), cv2.IMREAD_COLOR)
-    if img is None:
+    try:
+        img = cv2.imdecode(np.frombuffer(photo.read_bytes(), np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            return None
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    except (cv2.error, OSError):  # an empty or truncated download
         return None
-    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
     return buf.tobytes() if ok else None
 
 

@@ -100,3 +100,29 @@ def test_photos_go_to_the_model_as_jpeg(tmp_path):
     junk = tmp_path / "junk.jpg"
     junk.write_bytes(b"not an image")
     assert slab.as_jpeg(junk) is None
+
+
+def test_slab_reads_rotate_failures_and_hold_unread_deals(env, monkeypatch):
+    s, db, _ = env
+    s = s.__class__(**{**s.__dict__, "llm_url": "http://llm.invalid"})
+    monkeypatch.setattr(sweep, "MAX_SLAB_READS", 1)
+
+    def download(_src, dest):
+        dest.write_bytes(b"x" * 2000)
+        return dest
+
+    asked = []
+    monkeypatch.setattr(sweep.photos, "download", download)
+    monkeypatch.setattr(sweep.slab, "read", lambda *a: asked.append(a[3].name))  # always fails
+    db.run("UPDATE listings SET art = NULL, deal = 1")
+    run_id = db.one("SELECT max(id) AS n FROM runs")["n"]
+    sweep.slab_check(db, s, run_id)
+    first = asked[-1]
+    held = db.one("SELECT deal FROM listings WHERE item_id != ?", first.split(".")[0])
+    assert held["deal"] == 0  # over the limit: no alert before its slab is read
+    db.run("UPDATE listings SET deal = 1")
+    sweep.slab_check(db, s, run_id)
+    assert asked[-1] != first  # the failed one waits behind the never-tried one
+    assert (
+        db.one("SELECT count(*) AS n FROM listings WHERE active = 1")["n"] == 2
+    )  # failures drop nothing
