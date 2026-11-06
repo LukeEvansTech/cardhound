@@ -216,6 +216,8 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             r["v"] = sweep.verdict_for(db, s, r, w, cmp, pop)
             r["artd"] = json.loads(r["art"]) if r.get("art") else {}
             r["bid_to"] = snipe_bid(r)
+            # Gixen bids in the listing's own currency, so a dollar figure goes only on USD listings.
+            r["gixen_bid"] = r["bid_to"] if r.get("cur") == "USD" else None
             out.append(r)
         return out
 

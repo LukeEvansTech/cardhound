@@ -100,6 +100,7 @@ def row(item: dict, now: dt.datetime | None = None) -> dict | None:
     title = item.get("title", "")
     options = item.get("buyingOptions") or []
     usd = _money(item.get("currentBidPrice")) if "AUCTION" in options else None
+    priced = item.get("currentBidPrice") if usd is not None else item.get("price")
     if usd is None:
         usd = _money(item.get("price"))
     if not item_id or not title or usd is None:
@@ -131,6 +132,8 @@ def row(item: dict, now: dt.datetime | None = None) -> dict | None:
         "price": f"${usd:,.2f}",
         "text": " ".join(bits),
         "img": img,
+        # The listing's own currency: eBay.com shows a Canadian auction in dollars converted from CAD.
+        "cur": (priced or {}).get("convertedFromCurrency") or (priced or {}).get("currency", ""),
     }
     if "AUCTION" in options:
         try:  # the exact end, in the sweep's local clock like its other timestamps

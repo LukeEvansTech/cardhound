@@ -182,3 +182,15 @@ def test_incomplete_or_bad_searches_fail():
         return real(req)
 
     assert api(flaky).search(match.search_url("aki")) == []
+
+
+def test_row_keeps_the_listings_own_currency():
+    assert row(item(1, "x"))["cur"] == "USD"
+    cad = {
+        "value": "66.00",
+        "currency": "USD",
+        "convertedFromValue": "90.00",
+        "convertedFromCurrency": "CAD",
+    }
+    auction = item(2, "x", buyingOptions=["AUCTION"], currentBidPrice=cad, bidCount=1)
+    assert row(auction)["cur"] == "CAD"

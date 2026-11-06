@@ -29,7 +29,8 @@ def test_tiles_say_auction_or_buy_it_now_and_auctions_link_to_gixen(env):
     html = client.get("/?show=all").text
     assert 'class="fmt fmt-auction">Auction<' in html
     assert 'class="fmt fmt-bin">Buy it now<' in html
-    assert html.count("gixen.com/autosnipe.php?itemid=111&amp;maxbid=") == 1  # the auction only
+    assert "gixen.com/autosnipe.php?itemid=111" in html  # the auction only
+    assert "maxbid" not in html  # its currency is unknown (browser search), so no bid is filled in
     assert "itemid=333" not in html
     assert "autosnipe.php?itemid=111" in client.get("/deal/111/psa").text
 
@@ -62,6 +63,8 @@ def test_slab_reads_rule_out_other_graders_and_lower_grades():
     assert slab.wrong(slab.parse('{"grader": "PSA", "grade": "10", "sure": true}')) == ""
     assert slab.wrong(slab.parse('{"grader": "CGC", "grade": "9", "sure": false}')) == ""
     assert slab.wrong(slab.parse('{"grader": "NONE", "grade": "", "sure": true}')) == ""
+    assert slab.wrong(slab.parse('{"grader": "PSA", "grade": "10.00", "sure": true}')) == ""
+    assert slab.wrong(slab.parse('{"grader": "PSA", "grade": "unreadable", "sure": true}')) == ""
     assert slab.parse("no idea") is None
 
 
@@ -100,6 +103,7 @@ def test_photos_go_to_the_model_as_jpeg(tmp_path):
     junk = tmp_path / "junk.jpg"
     junk.write_bytes(b"not an image")
     assert slab.as_jpeg(junk) is None
+    assert not junk.exists()  # evicted, so the next sweep downloads it again
 
 
 def test_slab_reads_rotate_failures_and_hold_unread_deals(env, monkeypatch):
@@ -126,3 +130,11 @@ def test_slab_reads_rotate_failures_and_hold_unread_deals(env, monkeypatch):
     assert (
         db.one("SELECT count(*) AS n FROM listings WHERE active = 1")["n"] == 2
     )  # failures drop nothing
+
+
+def test_the_gixen_bid_is_filled_in_only_for_dollar_listings(env):
+    _, db, client = env
+    db.run("UPDATE listings SET cur = 'USD' WHERE item_id = '111'")
+    assert "autosnipe.php?itemid=111&amp;maxbid=" in client.get("/?show=all").text
+    db.run("UPDATE listings SET cur = 'CAD' WHERE item_id = '111'")
+    assert "maxbid" not in client.get("/?show=all").text

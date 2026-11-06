@@ -73,14 +73,17 @@ def as_jpeg(photo: Path) -> bytes | None:
     import cv2
     import numpy as np
 
+    out = None
     try:
         img = cv2.imdecode(np.frombuffer(photo.read_bytes(), np.uint8), cv2.IMREAD_COLOR)
-        if img is None:
-            return None
-        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        if img is not None:
+            ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            out = buf.tobytes() if ok else None
     except (cv2.error, OSError):  # an empty or truncated download
-        return None
-    return buf.tobytes() if ok else None
+        out = None
+    if out is None:
+        photo.unlink(missing_ok=True)  # so the next sweep downloads it again
+    return out
 
 
 def parse(text: str) -> dict | None:
@@ -107,6 +110,8 @@ def wrong(v: dict | None) -> str:
         return ""
     if v["grader"] != "PSA":
         return f"slab is {v['grader']} {v['grade']}".strip()
-    if v["grade"] and v["grade"] not in ("10", "10.0"):
-        return f"slab is PSA {v['grade']}"
-    return ""
+    try:
+        grade = float(v["grade"])
+    except ValueError:
+        return ""  # no number read off the label: inconclusive
+    return f"slab is PSA {v['grade']}" if 1 <= grade < 10 else ""

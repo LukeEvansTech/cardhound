@@ -16,6 +16,6 @@
     {% if r.artd.verdict == 'match' %}<span class="ok">art matches</span>{% elif r.artd.verdict == 'differs' %}<b class="warn">art differs</b>{% elif r.artd.verdict == 'unclear' %}<span>art unclear</span>{% endif %}
   </div>
   {% if r.auction and r.active %}
-  <a class="snipe-btn button" href="{{ gixen_link(r.item_id, r.bid_to) }}" target="_blank" rel="noopener">Add to Gixen{% if r.bid_to %} · up to {{ r.bid_to | money }}{% endif %}</a>
+  <a class="snipe-btn button" href="{{ gixen_link(r.item_id, r.gixen_bid) }}" target="_blank" rel="noopener">Add to Gixen{% if r.gixen_bid %} · up to {{ r.gixen_bid | money }}{% endif %}</a>
   {% endif %}
 </article>

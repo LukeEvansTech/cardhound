@@ -121,6 +121,7 @@ def collect(
                     ),
                     "obo": int("or Best Offer" in r["text"]),
                     "img": r.get("img", ""),
+                    "cur": r.get("cur", ""),
                     "cap": cap,
                     "deal": int(cap is not None and usd + (ship or 0) <= cap),
                 }
@@ -194,14 +195,14 @@ def store(db: DB, run_id: int, found: list[dict], sold: list[dict], searched: li
             c.execute(
                 """INSERT INTO listings (item_id, kind, want_id, title, usd, ship, star, auction, bids,
                        time_left, obo, img, cap, deal, first_seen, last_seen, first_run, last_run,
-                       low_usd, active, ends)
+                       low_usd, active, ends, cur)
                    VALUES (:item_id, :kind, :want_id, :title, :usd, :ship, :star, :auction, :bids,
-                       :time_left, :obo, :img, :cap, :deal, :now, :now, :run, :run, :usd, 1, :ends)
+                       :time_left, :obo, :img, :cap, :deal, :now, :now, :run, :run, :usd, 1, :ends, :cur)
                    ON CONFLICT(item_id, kind) DO UPDATE SET
                        want_id = excluded.want_id, title = excluded.title, usd = excluded.usd,
                        ship = excluded.ship, star = excluded.star, auction = excluded.auction,
                        bids = excluded.bids, time_left = excluded.time_left, obo = excluded.obo,
-                       ends = excluded.ends,
+                       ends = excluded.ends, cur = excluded.cur,
                        img = excluded.img, cap = excluded.cap, deal = excluded.deal,
                        last_seen = excluded.last_seen, last_run = excluded.last_run,
                        low_usd = min(listings.low_usd, excluded.usd), active = 1""",
