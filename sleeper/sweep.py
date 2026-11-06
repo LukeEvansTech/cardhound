@@ -236,6 +236,16 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
     )
     pages = ITEM_PAGES_PER_RUN
     everyone = {x["_id"]: x for x in db.wants(enabled_only=True)}  # siblings outside this sweep too
+    todo: dict[int, dict] = {}
+    for wid in {r["want_id"] for r in rows}:
+        for x in [everyone.get(wid) or wants.get(wid)] + [
+            everyone[i] for i in siblings_of(wid, everyone)
+        ]:
+            if x:
+                todo[x["_id"]] = x
+    tried: set[str] = set()
+    for x in todo.values():
+        photos.fetch_prints(x, s.refs_dir, tried)
     for r in rows:
         w = wants.get(r["want_id"])
         old = json.loads(r["art"]) if r["art"] else {}
@@ -257,7 +267,9 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             continue
         res = photos.check(w, r["item_id"], r["img"], s.refs_dir, s.photos_dir)
         shots = [res["photo"]] if res.get("photo") else []
-        if res["verdict"] in ("differs", "unclear", "unwanted"):
+        # A photo already identified as another print stands: in a gallery close-up the drawing
+        # it shares with the wanted print can still match, here and for a sibling.
+        if res["verdict"] in ("differs", "unclear", "unwanted") and not res.get("print"):
             srcs = []
             if b is not None and pages > 0:
                 pages -= 1
@@ -268,15 +280,22 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
                 complete = complete and alt["verdict"] != "unchecked"
                 if alt.get("photo"):
                     shots.append(alt["photo"])
+                if alt.get("print"):  # this gallery photo is another print: it stands
+                    res = alt
+                    break
                 if alt["verdict"] == "match":  # a kept art matching beats any other score
                     res = alt
                     break
                 if (alt["score"] or 0) > (res["score"] or 0):
                     res = alt
             # Until one of the listing's own photos was scored, the thumbnail verdict is provisional.
-            res["retry"] = not complete and res["verdict"] != "match"
+            res["retry"] = not complete and res["verdict"] != "match" and not res.get("print")
         res["refs"] = refs_now
-        if res["verdict"] != "match" and move_to_sibling(db, s, r, w, everyone, shots):
+        if res.get("print"):  # only the photo that showed another print says whose print it is
+            shots = [res["photo"]]
+        if res["verdict"] != "match" and move_to_sibling(
+            db, s, r, w, everyone, shots, res.get("print")
+        ):
             continue
         db.run(
             "UPDATE listings SET art = ? WHERE item_id = ? AND kind = ?",
@@ -364,12 +383,19 @@ def slab_check(db: DB, s: Settings, run_id: int) -> int:
 def cache_key(s: Settings, w: dict, wants: dict[int, dict]) -> list[str]:
     """What a photo verdict was judged against: the art and skips of this want and of each sibling print,
     since a listing that misses its own print may belong to a sibling."""
-    key = photos.ref_key(w, photos.refs_for(w, s.refs_dir))
+    key = photos.ref_key(w, photos.refs_for(w, s.refs_dir), photos.compared(w, s.refs_dir))
     for sid in sorted(siblings(w, wants)):
         sib = wants[sid]
-        key += [f"sib:{sid}:{x}" for x in photos.ref_key(sib, photos.refs_for(sib, s.refs_dir))]
+        sib_key = photos.ref_key(
+            sib, photos.refs_for(sib, s.refs_dir), photos.compared(sib, s.refs_dir)
+        )
+        key += [f"sib:{sid}:{x}" for x in sib_key]
         key.append(f"sib:{sid}:raw={sib.get('raw', True) is not False}")
     return key
+
+
+def siblings_of(wid: int, wants: dict[int, dict]) -> list[int]:
+    return siblings(wants[wid], wants) if wid in wants else []
 
 
 def siblings(w: dict, wants: dict[int, dict]) -> list[int]:
@@ -379,7 +405,13 @@ def siblings(w: dict, wants: dict[int, dict]) -> list[int]:
 
 
 def move_to_sibling(
-    db: DB, s: Settings, r: Any, w: dict, wants: dict[int, dict], shots: list[str]
+    db: DB,
+    s: Settings,
+    r: Any,
+    w: dict,
+    wants: dict[int, dict],
+    shots: list[str],
+    seen: str | None = None,
 ) -> bool:
     """A photo that is another print of the same card moves the listing to that print's want."""
     family = match.comp_id(w)
@@ -388,6 +420,7 @@ def move_to_sibling(
         for x in wants.values()
         if x["_id"] != w["_id"]
         and match.comp_id(x) == family
+        and (not seen or photos.wants_print(x, seen, s.refs_dir))  # the print the photo showed
         and r["kind"] in {k for k, _ in match.searches(x)}  # never into a print with raw off
         and match.keep(x, r["kind"], r["title"], r["title"])  # star tier and number must agree
     ]

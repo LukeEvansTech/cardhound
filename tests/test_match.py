@@ -11,6 +11,15 @@ def test_stars_buckets():
     assert match.stars("Edward Elric UE09BT common") == "-"
 
 
+def test_bare_asterisk_is_a_separator_not_a_star():
+    # listing 820176195712: a plain SR, the asterisks are punctuation
+    assert match.stars("Lust * UE09BT/FMA-1-090 SR * Union Arena * Fullmetal Alchemist * NM") == "-"
+    assert match.stars("*Sealed* Mikasa Ackermann (Winner) Attack on Titan Union Arena") == "-"
+    assert match.stars("Union Arena | Father (SR*) | UE09BT/FMA-1-079 | NM") == "1"
+    assert match.stars("Angel Devil (010) (R*) - UE22BT: CHAINSAW MAN") == "1"
+    assert match.stars("Attack On Titan Vol. 2 / Mikasa Ackerman (066) / U*") == "1"
+
+
 def test_union_arena_searches_use_set_words():
     (k1, q1), (k2, q2) = match.searches(EDWARD)
     assert (k1, k2) == ("psa", "raw")

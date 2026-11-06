@@ -16,7 +16,7 @@
 <section class="pics">
   <figure>
     {% if r.artd.photo %}<img src="/photos/{{ r.artd.photo }}" alt="Listing photo">{% else %}<img src="{{ r.img | ebay_img(1600) }}" alt="Listing photo">{% endif %}
-    <figcaption>Listing photo{% if r.artd.verdict and r.artd.verdict != 'unchecked' %}: photo check <b class="{{ 'ok' if r.artd.verdict == 'match' else 'warn' }}">{{ r.artd.verdict }}</b> (score {{ r.artd.score }}){% endif %}</figcaption>
+    <figcaption>Listing photo{% if r.artd.verdict and r.artd.verdict != 'unchecked' %}: photo check <b class="{{ 'ok' if r.artd.verdict == 'match' else 'warn' }}">{{ r.artd.verdict }}</b> (score {{ r.artd.score }}){% if r.artd.print %}, looks like the {{ r.artd.print }} print{% endif %}{% endif %}</figcaption>
   </figure>
   {% set ordered = ([r.artd.ref] if r.artd.ref in refs else []) + (refs | reject('equalto', r.artd.ref) | list) %}
   {% for ref in ordered[:3] %}
