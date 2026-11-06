@@ -48,6 +48,10 @@ class Settings:
         default_factory=lambda: os.environ.get("SLEEPER_SUMMARY_SCHEDULE", "30 8 * * *")
     )
     headless: bool = field(default_factory=lambda: os.environ.get("SLEEPER_HEADLESS", "1") != "0")
+    # OpenAI-compatible endpoint (the cluster's LiteLLM) that reads slab labels. Empty: no slab check.
+    llm_url: str = field(default_factory=lambda: os.environ.get("SLEEPER_LLM_URL", "").rstrip("/"))
+    llm_key: str = field(default_factory=lambda: os.environ.get("SLEEPER_LLM_KEY", ""))
+    llm_model: str = field(default_factory=lambda: os.environ.get("SLEEPER_LLM_MODEL", "claude"))
     version: str = field(default_factory=lambda: os.environ.get("APP_VERSION", "0.0.0-dev"))
 
     @property

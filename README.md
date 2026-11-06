@@ -12,6 +12,7 @@ buy the slab, buy raw and grade, or pass.
 sweep (cron) ─▶ eBay search per want (Browse API or headless Chromium) ─▶ listings
               ─▶ ceiling + comps + gem rate ─▶ verdict per listing
               ─▶ photo check against the official art (OpenCV ORB)
+              ─▶ slab check: a vision model reads the label; a CGC or non-10 slab is dropped
               ─▶ alert each new deal (Apprise), deal page per alert
 ```
 
@@ -74,6 +75,9 @@ uid 65532 and works with a read-only root filesystem as long as `/tmp` is writab
 | `SLEEPER_TRIES`            | `8`                 | Page loads per search before it counts as failed.                      |
 | `EBAY_CLIENT_ID`           | none                | Browse API App ID. With the secret, replaces the browser for searches. |
 | `EBAY_CLIENT_SECRET`       | none                | Browse API Cert ID.                                                    |
+| `SLEEPER_LLM_URL`          | none                | Endpoint (OpenAI-compatible) that reads slab labels; empty: no check.  |
+| `SLEEPER_LLM_KEY`          | none                | Its API key.                                                           |
+| `SLEEPER_LLM_MODEL`        | `claude`            | Vision model name at that endpoint.                                    |
 
 ## API
 

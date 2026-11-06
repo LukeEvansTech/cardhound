@@ -84,6 +84,22 @@ SORTS: dict[str, Callable[[dict], Any]] = {
 }
 
 
+def snipe_bid(r: dict) -> float | None:
+    """The bid a Gixen snipe defaults to: the most that keeps it a deal, else the ceiling less
+    delivery. None when there is no positive, finite amount to offer (Luke types one on Gixen)."""
+    best = r["v"].max_bid
+    if best is None:
+        cap = r.get("cap") or 0
+        best = math.floor(cap - (r.get("ship") or 0)) if math.isfinite(cap) and cap > 0 else 0
+    return float(best) if best and best > 0 else None
+
+
+def gixen_link(item_id: str, bid: float | None) -> str:
+    """Gixen's add-snipe form with the item (and bid) filled in; Luke signs in and presses Add."""
+    q = {"itemid": item_id} | ({"maxbid": f"{bid:.2f}"} if bid else {})
+    return "https://www.gixen.com/autosnipe.php?" + urllib.parse.urlencode(q)
+
+
 def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False) -> FastAPI:
     db = db or DB(s.db_path)
     app = FastAPI(title="sleeper", docs_url=None, redoc_url=None)
@@ -104,6 +120,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     tpl.env.filters["star"] = star_label
     tpl.env.filters["ebay_img"] = ebay_img
     tpl.env.filters["pct"] = pct
+    tpl.env.globals["gixen_link"] = gixen_link
     tpl.env.globals["version"] = s.version
 
     def when(iso: str) -> str:
@@ -198,6 +215,9 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             r["want"] = w
             r["v"] = sweep.verdict_for(db, s, r, w, cmp, pop)
             r["artd"] = json.loads(r["art"]) if r.get("art") else {}
+            r["bid_to"] = snipe_bid(r)
+            # Gixen bids in the listing's own currency, so a dollar figure goes only on USD listings.
+            r["gixen_bid"] = r["bid_to"] if r.get("cur") == "USD" else None
             out.append(r)
         return out
 

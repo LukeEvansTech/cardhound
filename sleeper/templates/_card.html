@@ -1,8 +1,10 @@
-{# one listing tile, framed like a slab: r has v (verdict), want, artd #}
-<a class="tile rating-{{ r.v.rating }}{{ ' steal' if r.v.market and r.v.market <= 0.4 }}" href="/deal/{{ r.item_id }}/{{ r.kind }}">
+{# one listing tile, framed like a slab: r has v (verdict), want, artd. The name link stretches over the
+   tile, so the Gixen link can sit inside it without nesting one link in another. #}
+<article class="tile rating-{{ r.v.rating }}{{ ' steal' if r.v.market and r.v.market <= 0.4 }}">
+  <span class="fmt {{ 'fmt-auction' if r.auction else 'fmt-bin' }}">{{ 'Auction' if r.auction else 'Buy it now' }}</span>
   <div class="well"><img loading="lazy" src="{{ r.img | ebay_img(300) }}" alt="" width="300" height="400"></div>
   <div class="label">
-    <strong class="name">{{ r.want.who }}</strong>
+    <strong class="name"><a class="stretch" href="/deal/{{ r.item_id }}/{{ r.kind }}">{{ r.want.who }}</a></strong>
     <span class="meta"><span>{{ r.want.set }}</span><span>{{ 'PSA 10' if r.kind == 'psa' else 'raw' }}{% if r.star and r.star != '-' %} {{ r.star | star }}{% endif %}</span></span>
     <span class="grade"><span class="price">{{ r.v.total | money }}</span><span class="rating">{{ r.v.rating }}</span></span>
   </div>
@@ -13,4 +15,7 @@
     {% if r.obo %}<span>offers</span>{% endif %}
     {% if r.artd.verdict == 'match' %}<span class="ok">art matches</span>{% elif r.artd.verdict == 'differs' %}<b class="warn">art differs</b>{% elif r.artd.verdict == 'unclear' %}<span>art unclear</span>{% endif %}
   </div>
-</a>
+  {% if r.auction and r.active %}
+  <a class="snipe-btn button" href="{{ gixen_link(r.item_id, r.gixen_bid) }}" target="_blank" rel="noopener">Add to Gixen{% if r.gixen_bid %} · up to {{ r.gixen_bid | money }}{% endif %}</a>
+  {% endif %}
+</article>

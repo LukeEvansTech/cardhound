@@ -8,6 +8,7 @@
   <div class="actions">
     <a class="button primary" href="https://www.ebay.com/itm/{{ r.item_id }}">Open on eBay</a>
     <a class="button" href="/wants/{{ w._id }}">Edit want</a>
+    {% if r.auction and r.active %}<a class="button" href="{{ gixen_link(r.item_id, r.gixen_bid) }}" target="_blank" rel="noopener">Add to Gixen{% if r.gixen_bid %} · up to {{ r.gixen_bid | money }}{% endif %}</a>{% endif %}
   </div>
   {% if not r.active %}<p class="warn">This listing was not in the latest search: it may have sold or ended.</p>{% endif %}
 </section>

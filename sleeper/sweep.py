@@ -14,7 +14,7 @@ import re
 import threading
 from typing import Any, Callable, Protocol
 
-from . import match, notify, photos, value
+from . import match, notify, photos, slab, value
 from .config import Settings
 from .db import DB
 from .ebay import Browser
@@ -121,6 +121,7 @@ def collect(
                     ),
                     "obo": int("or Best Offer" in r["text"]),
                     "img": r.get("img", ""),
+                    "cur": r.get("cur", ""),
                     "cap": cap,
                     "deal": int(cap is not None and usd + (ship or 0) <= cap),
                 }
@@ -194,14 +195,14 @@ def store(db: DB, run_id: int, found: list[dict], sold: list[dict], searched: li
             c.execute(
                 """INSERT INTO listings (item_id, kind, want_id, title, usd, ship, star, auction, bids,
                        time_left, obo, img, cap, deal, first_seen, last_seen, first_run, last_run,
-                       low_usd, active, ends)
+                       low_usd, active, ends, cur)
                    VALUES (:item_id, :kind, :want_id, :title, :usd, :ship, :star, :auction, :bids,
-                       :time_left, :obo, :img, :cap, :deal, :now, :now, :run, :run, :usd, 1, :ends)
+                       :time_left, :obo, :img, :cap, :deal, :now, :now, :run, :run, :usd, 1, :ends, :cur)
                    ON CONFLICT(item_id, kind) DO UPDATE SET
                        want_id = excluded.want_id, title = excluded.title, usd = excluded.usd,
                        ship = excluded.ship, star = excluded.star, auction = excluded.auction,
                        bids = excluded.bids, time_left = excluded.time_left, obo = excluded.obo,
-                       ends = excluded.ends,
+                       ends = excluded.ends, cur = excluded.cur,
                        img = excluded.img, cap = excluded.cap, deal = excluded.deal,
                        last_seen = excluded.last_seen, last_run = excluded.last_run,
                        low_usd = min(listings.low_usd, excluded.usd), active = 1""",
@@ -283,6 +284,81 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             r["item_id"],
             r["kind"],
         )
+
+
+MAX_SLAB_READS = 60  # vision calls per sweep; the rest wait for the next one
+
+
+def _slab_due(r: Any, photo_name: str) -> str:
+    """Sort key for a listing whose slab is still to read ('' first), or '~' when it is done.
+    Unread first, then failed tries oldest first; an unsure read is read again once its photo changed.
+    """
+    v = json.loads(r["slab"]) if r["slab"] else None
+    if v is None:
+        return ""
+    if "failed" in v:
+        return v["failed"]
+    unsure = not v.get("sure") or v.get("grader") == "NONE" or not slab.grade_of(v)
+    return "0" if unsure and v.get("photo") != photo_name else "~"
+
+
+def slab_check(db: DB, s: Settings, run_id: int) -> int:
+    """Read the slab label of each live PSA 10 listing; drop one that is another grader's slab
+    (a CGC 9 titled "PSA 10") or a lower PSA grade. Returns how many were dropped.
+
+    A deal whose slab could not be read this sweep (over the limit) is held out of this sweep's
+    alerts and rated again next sweep. A failed read is not held: an LLM outage must not stop alerts.
+    """
+    if not s.llm_url:
+        return 0
+    rows = db.all(
+        "SELECT item_id, kind, img, art, slab, deal FROM listings WHERE kind = 'psa' AND active = 1 "
+        "AND last_run = ?",
+        run_id,
+    )
+    due = []
+    for r in rows:
+        art = json.loads(r["art"]) if r["art"] else {}
+        key = _slab_due(r, art.get("photo") or "")
+        if key != "~":
+            due.append((0 if r["deal"] else 1, key, r, art))
+    due.sort(key=lambda x: (x[0], x[1]))
+    dropped = 0
+    for n, (_, _, r, art) in enumerate(due):
+        if n >= MAX_SLAB_READS:
+            if r["deal"] and not r["slab"]:  # never read: no alert until it is
+                db.run(
+                    "UPDATE listings SET deal = 0 WHERE item_id = ? AND kind = ?",
+                    r["item_id"],
+                    r["kind"],
+                )
+            continue
+        photo = s.photos_dir / art["photo"] if art.get("photo") else None
+        if not (photo and photo.exists()):
+            photo = photos.download(photos.upgrade(r["img"]), s.photos_dir / f"{r['item_id']}.jpg")
+        v = slab.read(s.llm_url, s.llm_key, s.llm_model, photo) if photo else None
+        if v is None:
+            v = {"failed": dt.datetime.now().isoformat(timespec="seconds")}
+        else:
+            v["photo"] = art.get("photo") or ""
+        why = slab.wrong(v) if "failed" not in v else ""
+        with db.tx() as c:  # the read and the rejection together: a cached CGC read always drops
+            c.execute(
+                "UPDATE listings SET slab = ? WHERE item_id = ? AND kind = ?",
+                (json.dumps(v), r["item_id"], r["kind"]),
+            )
+            if why:
+                c.execute(
+                    "INSERT OR REPLACE INTO blocked (item_id, reason) VALUES (?, ?)",
+                    (r["item_id"], why),
+                )
+                c.execute(
+                    "UPDATE listings SET active = 0, deal = 0 WHERE item_id = ?", (r["item_id"],)
+                )
+        if why:
+            dropped += 1
+            log.info("listing %s dropped: %s", r["item_id"], why)
+    return dropped
 
 
 def cache_key(s: Settings, w: dict, wants: dict[int, dict]) -> list[str]:
@@ -635,6 +711,7 @@ def run(
                 "AND json_extract(art, '$.verdict') = 'unwanted'",
                 run_id,
             )
+            say(f"slab check: {slab_check(db, s, run_id)} not a PSA 10 slab")
         row = db.one("SELECT count(*) AS n FROM listings WHERE last_run = ? AND deal = 1", run_id)
         deals = row["n"] if row else 0
         first = not db.get("baseline_done", False)
