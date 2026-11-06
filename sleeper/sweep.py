@@ -288,7 +288,7 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
 MAX_SLAB_READS = 60  # vision calls per sweep; the rest wait for the next one
 
 
-def _slab_due(r: dict, photo_name: str) -> str:
+def _slab_due(r: Any, photo_name: str) -> str:
     """Sort key for a listing whose slab is still to read ('' first), or '~' when it is done.
     Unread first, then failed tries oldest first; an unsure read is read again once its photo changed.
     """
