@@ -298,7 +298,7 @@ def _slab_due(r: Any, photo_name: str) -> str:
         return ""
     if "failed" in v:
         return v["failed"]
-    unsure = not v.get("sure") or v.get("grader") == "NONE"
+    unsure = not v.get("sure") or v.get("grader") == "NONE" or not slab.grade_of(v)
     return "0" if unsure and v.get("photo") != photo_name else "~"
 
 

@@ -104,14 +104,22 @@ def parse(text: str) -> dict | None:
     }
 
 
+def grade_of(v: dict) -> float | None:
+    """The label's grade as a number from 1 to 10, or None when none was read."""
+    try:
+        grade = float(v.get("grade") or "")
+    except ValueError:
+        return None
+    return grade if 1 <= grade <= 10 else None
+
+
 def wrong(v: dict | None) -> str:
     """Why a slab read rules out a PSA 10 listing, or '' when it does not."""
     if not v or not v["sure"] or v["grader"] == "NONE":
         return ""
     if v["grader"] != "PSA":
         return f"slab is {v['grader']} {v['grade']}".strip()
-    try:
-        grade = float(v["grade"])
-    except ValueError:
+    grade = grade_of(v)
+    if grade is None:
         return ""  # no number read off the label: inconclusive
-    return f"slab is PSA {v['grade']}" if 1 <= grade < 10 else ""
+    return f"slab is PSA {v['grade']}" if grade < 10 else ""
