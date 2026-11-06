@@ -31,7 +31,10 @@ sure is true only when the label's company is clearly legible."""
 
 def read(url: str, key: str, model: str, photo: Path, timeout: int = 90) -> dict | None:
     """{'grader', 'grade', 'sure'} from the photo, or None when the model gave no usable answer."""
-    data = base64.b64encode(photo.read_bytes()).decode()
+    jpeg = as_jpeg(photo)
+    if jpeg is None:
+        return None
+    data = base64.b64encode(jpeg).decode()
     body = json.dumps(
         {
             "model": model,
@@ -62,6 +65,19 @@ def read(url: str, key: str, model: str, photo: Path, timeout: int = 90) -> dict
         log.warning("slab read failed: %s", type(e).__name__)
         return None
     return parse(text)
+
+
+def as_jpeg(photo: Path) -> bytes | None:
+    """The photo as JPEG bytes: eBay may serve PNG or WebP under a .jpg name, and the model
+    refuses an image whose bytes do not match its declared type."""
+    import cv2
+    import numpy as np
+
+    img = cv2.imdecode(np.frombuffer(photo.read_bytes(), np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        return None
+    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    return buf.tobytes() if ok else None
 
 
 def parse(text: str) -> dict | None:

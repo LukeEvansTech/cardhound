@@ -78,8 +78,6 @@ uid 65532 and works with a read-only root filesystem as long as `/tmp` is writab
 | `SLEEPER_LLM_URL`          | none                | Endpoint (OpenAI-compatible) that reads slab labels; empty: no check.  |
 | `SLEEPER_LLM_KEY`          | none                | Its API key.                                                           |
 | `SLEEPER_LLM_MODEL`        | `claude`            | Vision model name at that endpoint.                                    |
-| `GIXEN_USERNAME`           | none                | Gixen login for the snipe button (Gixen's API needs Gixen Plus).       |
-| `GIXEN_PASSWORD`           | none                | Its password; empty: no snipe button.                                  |
 
 ## API
 

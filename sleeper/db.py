@@ -90,12 +90,6 @@ CREATE TABLE IF NOT EXISTS run_alerts (
     kind TEXT NOT NULL,
     PRIMARY KEY (run_id, item_id, kind)
 );
-CREATE TABLE IF NOT EXISTS snipes (
-    item_id TEXT PRIMARY KEY,
-    maxbid REAL NOT NULL,
-    result TEXT NOT NULL,
-    created TEXT NOT NULL DEFAULT (datetime('now'))
-);
 CREATE TABLE IF NOT EXISTS blocked (
     item_id TEXT PRIMARY KEY,
     reason TEXT NOT NULL,

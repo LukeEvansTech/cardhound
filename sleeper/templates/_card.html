@@ -1,5 +1,5 @@
 {# one listing tile, framed like a slab: r has v (verdict), want, artd. The name link stretches over the
-   tile, so the snipe form can sit inside it without nesting a form in a link. #}
+   tile, so the Gixen link can sit inside it without nesting one link in another. #}
 <article class="tile rating-{{ r.v.rating }}{{ ' steal' if r.v.market and r.v.market <= 0.4 }}">
   <span class="fmt {{ 'fmt-auction' if r.auction else 'fmt-bin' }}">{{ 'Auction' if r.auction else 'Buy it now' }}</span>
   <div class="well"><img loading="lazy" src="{{ r.img | ebay_img(300) }}" alt="" width="300" height="400"></div>
@@ -16,13 +16,6 @@
     {% if r.artd.verdict == 'match' %}<span class="ok">art matches</span>{% elif r.artd.verdict == 'differs' %}<b class="warn">art differs</b>{% elif r.artd.verdict == 'unclear' %}<span>art unclear</span>{% endif %}
   </div>
   {% if r.auction and r.active %}
-  {% if r.snipe %}<p class="snipe-set">Gixen snipe up to {{ r.snipe.maxbid | money }}</p>
-  {% elif gixen_on and r.bid_to %}
-  <form class="snipe" method="post" action="/deal/{{ r.item_id }}/{{ r.kind }}/gixen">
-    <input type="hidden" name="maxbid" value="{{ '%.2f' | format(r.bid_to) }}">
-    <input type="hidden" name="back" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}">
-    <button class="snipe-btn" type="submit">Snipe on Gixen up to {{ r.bid_to | money }}</button>
-  </form>
-  {% endif %}
+  <a class="snipe-btn button" href="{{ gixen_link(r.item_id, r.bid_to) }}" target="_blank" rel="noopener">Add to Gixen{% if r.bid_to %} · up to {{ r.bid_to | money }}{% endif %}</a>
   {% endif %}
 </article>

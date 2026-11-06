@@ -52,9 +52,6 @@ class Settings:
     llm_url: str = field(default_factory=lambda: os.environ.get("SLEEPER_LLM_URL", "").rstrip("/"))
     llm_key: str = field(default_factory=lambda: os.environ.get("SLEEPER_LLM_KEY", ""))
     llm_model: str = field(default_factory=lambda: os.environ.get("SLEEPER_LLM_MODEL", "claude"))
-    # Gixen login, for the snipe button on auctions (Gixen's API needs a paid Gixen Plus account).
-    gixen_user: str = field(default_factory=lambda: os.environ.get("GIXEN_USERNAME", ""))
-    gixen_password: str = field(default_factory=lambda: os.environ.get("GIXEN_PASSWORD", ""))
     version: str = field(default_factory=lambda: os.environ.get("APP_VERSION", "0.0.0-dev"))
 
     @property

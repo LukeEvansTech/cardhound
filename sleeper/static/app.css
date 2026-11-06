@@ -1353,42 +1353,11 @@ kbd {
   border: 1px solid var(--line);
 }
 
-.snipe {
+.snipe-btn {
   position: relative;
   z-index: 2;
-  padding: 0 12px 12px;
-}
-
-.snipe-btn {
-  width: 100%;
+  margin: 0 12px 12px;
   min-height: 36px;
   font-size: 0.82rem;
 }
 
-.snipe-set {
-  margin: 0;
-  padding: 0 12px 10px;
-  color: var(--accent);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.note {
-  margin: 0 0 16px;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--accent);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-}
-
-.snipe-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.snipe-bid {
-  width: 8rem;
-}
