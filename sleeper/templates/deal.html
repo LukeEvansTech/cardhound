@@ -9,6 +9,17 @@
     <a class="button primary" href="https://www.ebay.com/itm/{{ r.item_id }}">Open on eBay</a>
     <a class="button" href="/wants/{{ w._id }}">Edit want</a>
   </div>
+  {% if r.auction and r.active %}
+  {% if r.snipe %}<p class="snipe-set">Gixen snipe set: up to {{ r.snipe.maxbid | money }} ({{ r.snipe.created }} UTC)</p>{% endif %}
+  {% if r.snipe %}
+  {% elif gixen_on %}
+  <form class="snipe-form" method="post" action="/deal/{{ r.item_id }}/{{ r.kind }}/gixen">
+    <label for="maxbid">Gixen max bid, $</label>
+    <input id="maxbid" name="maxbid" type="number" step="0.01" min="0.01" required value="{{ '%.2f' | format(r.bid_to) if r.bid_to }}">
+    <button type="submit">Snipe on Gixen</button>
+  </form>
+  {% else %}<p class="muted small">Add a Gixen login to the sleeper secret to snipe from here.</p>{% endif %}
+  {% endif %}
   {% if not r.active %}<p class="warn">This listing was not in the latest search: it may have sold or ended.</p>{% endif %}
 </section>
 

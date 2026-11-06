@@ -1304,3 +1304,91 @@ kbd {
 .summary-paper .sx-unknown {
   color: var(--unknown) !important;
 }
+
+/* --- format badge, stretched tile link, Gixen snipe --- */
+
+/* The name link covers the whole tile, so the tile still opens the deal; the snipe form sits above. */
+.tile .stretch {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tile .stretch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.tile:has(.stretch:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tile .stretch:focus-visible {
+  outline: none;
+}
+
+.fmt {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.fmt-auction {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.fmt-bin {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+}
+
+.snipe {
+  position: relative;
+  z-index: 2;
+  padding: 0 12px 12px;
+}
+
+.snipe button {
+  width: 100%;
+  min-height: 36px;
+  font-size: 0.82rem;
+}
+
+.snipe-set {
+  margin: 0;
+  padding: 0 12px 10px;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.note {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+
+.snipe-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.snipe-form input {
+  width: 8rem;
+}

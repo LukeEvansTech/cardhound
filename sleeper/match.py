@@ -34,6 +34,7 @@ FOREIGN_SELLER = re.compile(
     r"Spain|Belgium|Netherlands|Australia|United Kingdom)"
 )
 GRADED = re.compile(r"\b(psa|bgs|cgc|tag|ace|beckett|sgc|ars)\b", re.I)
+OTHER_GRADER = re.compile(r"\b(bgs|cgc|beckett|sgc)\b", re.I)
 
 # Union Arena sets the character wants cover: eBay OR-words for the PSA search, the set name for raw
 # searches, and the title hint a listing must carry to count.
@@ -192,6 +193,8 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
         return False  # voice-actor autographs, not the printed Masters signature SPR
     if kind == "psa":
         if w.get("needstar") and stars(title) == "-":
+            return False
+        if OTHER_GRADER.search(t):  # a CGC or BGS slab with "PSA 10" in the title for search
             return False
         return bool(re.search(r"psa ?10|psa gem", t))
     return not GRADED.search(t) and (bool(w.get("nostar")) or stars(title) != "-")

@@ -29,6 +29,7 @@
   </div>
 </header>
 <main>
+{% if request.query_params.get('note') %}<p class="note" role="status">{{ request.query_params.get('note') }}</p>{% endif %}
 {% block body %}{% endblock %}
 </main>
 <footer class="foot">sleeper {{ version }}. Prices are eBay.com US listings, landed at the Oregon forwarding address.</footer>

@@ -14,7 +14,7 @@ import re
 import threading
 from typing import Any, Callable, Protocol
 
-from . import match, notify, photos, value
+from . import match, notify, photos, slab, value
 from .config import Settings
 from .db import DB
 from .ebay import Browser
@@ -283,6 +283,48 @@ def photo_check(db: DB, s: Settings, b: Source | None, wants: dict[int, dict], r
             r["item_id"],
             r["kind"],
         )
+
+
+MAX_SLAB_READS = 40  # vision calls per sweep; the rest wait for the next one
+
+
+def slab_check(db: DB, s: Settings, run_id: int) -> int:
+    """Read the slab label of each live PSA 10 listing once; drop one that is another grader's slab
+    (a CGC 9 titled "PSA 10") or a lower PSA grade. Returns how many were dropped."""
+    if not s.llm_url:
+        return 0
+    rows = db.all(
+        "SELECT item_id, kind, img, art FROM listings WHERE kind = 'psa' AND active = 1 "
+        "AND last_run = ? AND slab IS NULL ORDER BY deal DESC LIMIT ?",
+        run_id,
+        MAX_SLAB_READS,
+    )
+    dropped = 0
+    for r in rows:
+        art = json.loads(r["art"]) if r["art"] else {}
+        photo = s.photos_dir / art["photo"] if art.get("photo") else None
+        if not (photo and photo.exists()):
+            photo = photos.download(photos.upgrade(r["img"]), s.photos_dir / f"{r['item_id']}.jpg")
+        if not photo:
+            continue
+        v = slab.read(s.llm_url, s.llm_key, s.llm_model, photo)
+        if v is None:
+            continue  # asked again next sweep
+        db.run(
+            "UPDATE listings SET slab = ? WHERE item_id = ? AND kind = ?",
+            json.dumps(v),
+            r["item_id"],
+            r["kind"],
+        )
+        why = slab.wrong(v)
+        if why:
+            dropped += 1
+            db.run(
+                "INSERT OR REPLACE INTO blocked (item_id, reason) VALUES (?, ?)", r["item_id"], why
+            )
+            db.run("UPDATE listings SET active = 0, deal = 0 WHERE item_id = ?", r["item_id"])
+            log.info("listing %s dropped: %s", r["item_id"], why)
+    return dropped
 
 
 def cache_key(s: Settings, w: dict, wants: dict[int, dict]) -> list[str]:
@@ -635,6 +677,7 @@ def run(
                 "AND json_extract(art, '$.verdict') = 'unwanted'",
                 run_id,
             )
+            say(f"slab check: {slab_check(db, s, run_id)} not a PSA 10 slab")
         row = db.one("SELECT count(*) AS n FROM listings WHERE last_run = ? AND deal = 1", run_id)
         deals = row["n"] if row else 0
         first = not db.get("baseline_done", False)

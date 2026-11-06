@@ -90,6 +90,12 @@ CREATE TABLE IF NOT EXISTS run_alerts (
     kind TEXT NOT NULL,
     PRIMARY KEY (run_id, item_id, kind)
 );
+CREATE TABLE IF NOT EXISTS snipes (
+    item_id TEXT PRIMARY KEY,
+    maxbid REAL NOT NULL,
+    result TEXT NOT NULL,
+    created TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS blocked (
     item_id TEXT PRIMARY KEY,
     reason TEXT NOT NULL,
@@ -110,6 +116,8 @@ class DB:
             cols = {r["name"] for r in c.execute("PRAGMA table_info(listings)")}
             if "ends" not in cols:  # auction end time, added 2026-11-05
                 c.execute("ALTER TABLE listings ADD COLUMN ends TEXT")
+            if "slab" not in cols:  # the slab label as read from the photo (JSON), added 2026-11-06
+                c.execute("ALTER TABLE listings ADD COLUMN slab TEXT")
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:

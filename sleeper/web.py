@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import match, notify, photos, summary, sweep, value
+from . import gixen, match, notify, photos, summary, sweep, value
 from .config import Settings
 from .db import DB
 
@@ -105,6 +105,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     tpl.env.filters["ebay_img"] = ebay_img
     tpl.env.filters["pct"] = pct
     tpl.env.globals["version"] = s.version
+    tpl.env.globals["gixen_on"] = bool(s.gixen_user and s.gixen_password)
 
     def when(iso: str) -> str:
         """An auction end in the app's timezone: '14:05 today', 'Fri 09:10'."""
@@ -189,6 +190,7 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
     def scored(rows: list[dict]) -> list[dict]:
         wants = {w["_id"]: w for w in db.wants()}
         cmp, pop = sweep.context(db)
+        snipes = {x["item_id"]: dict(x) for x in db.all("SELECT * FROM snipes")}
         out = []
         for r in rows:
             w = wants.get(r["want_id"])
@@ -198,6 +200,11 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
             r["want"] = w
             r["v"] = sweep.verdict_for(db, s, r, w, cmp, pop)
             r["artd"] = json.loads(r["art"]) if r.get("art") else {}
+            r["snipe"] = snipes.get(r["item_id"])
+            # The bid a snipe defaults to: the most that keeps it a deal, else the ceiling.
+            cap = r.get("cap") or 0
+            ceiling_bid = math.floor(cap - (r.get("ship") or 0)) if cap > 0 else 0
+            r["bid_to"] = r["v"].max_bid or (ceiling_bid if ceiling_bid > 0 else None)
             out.append(r)
         return out
 
@@ -335,6 +342,31 @@ def create_app(s: Settings, db: DB | None = None, start_scheduler: bool = False)
         )
         db.run("UPDATE listings SET active = 0 WHERE item_id = ?", item_id)
         return RedirectResponse(f"/deal/{item_id}/{kind}", status_code=303)
+
+    @app.post("/deal/{item_id}/{kind}/gixen")
+    def snipe(item_id: str, kind: str, maxbid: float = Form(...), back: str = Form("")):
+        """Add a Gixen snipe for this auction, then return to the page the button was on."""
+        try:
+            gixen.snipe(s.gixen_user, s.gixen_password, item_id, maxbid)
+            result, note = "added", f"Gixen snipe set: up to ${maxbid:,.2f}"
+        except gixen.GixenError as e:
+            result, note = f"failed: {e}", f"Gixen snipe not set: {e}"
+        if result == "added":  # the ledger holds snipes Gixen accepted, never failed tries
+            db.run(
+                "INSERT OR REPLACE INTO snipes (item_id, maxbid, result) VALUES (?, ?, ?)",
+                item_id,
+                maxbid,
+                result,
+            )
+        dest = (
+            back
+            if back.startswith("/") and not back.startswith("//")
+            else f"/deal/{item_id}/{kind}"
+        )
+        sep = "&" if "?" in dest else "?"
+        return RedirectResponse(
+            f"{dest}{sep}{urllib.parse.urlencode({'note': note})}", status_code=303
+        )
 
     @app.get("/run/{run_id}", response_class=HTMLResponse)
     def run_page(request: Request, run_id: int):
