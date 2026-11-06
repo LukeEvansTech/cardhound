@@ -37,6 +37,70 @@ def test_keep_drops_japanese_and_foreign_sellers():
     assert not match.keep(EDWARD, "psa", t2, t2 + " Located in Japan")
 
 
+def test_japanese_want_takes_japanese_titles_and_sellers():
+    w = {"set": "PKM", "who": "Hoopa", "q": "hoopa psa 10", "id": "hoopa", "lang": "japanese"}
+    t = "PSA 10 Hoopa 155/XY-P Movie Promo 2015 Pokemon Card Japanese"
+    assert match.keep(w, "psa", t, t + " Located in Japan")
+    assert not match.keep({**w, "lang": None}, "psa", t, t)
+    assert not match.keep(w, "psa", "PSA 10 Hoopa Japanese proxy", "")  # still not a fake
+    assert not match.keep(w, "psa", "PSA 10 Hoopa Korean", "")  # nor another language
+    assert not match.keep(w, "psa", t, t + " Located in China")
+    denji = {"set": "CSM", "who": "Denji", "cards": "UA16BT/CSM-1-001", "lang": "japanese"}
+    t3 = "PSA 10 Union Arena Chainsaw Man Denji UA16BT/CSM-1-001 Japanese"
+    assert match.keep(denji, "psa", t3, t3)  # a Japanese set code is not foreign
+    for code in ("UE22BT/CSM-1-001 English", "UEX07BT/CSM-1-001", "UEPR/CSM-1-001"):
+        t4 = f"PSA 10 Union Arena Chainsaw Man Denji {code}"
+        assert not match.keep(denji, "psa", t4, t4 + " Located in Japan"), code  # English prints
+
+
+def test_japanese_union_arena_promo_needs_no_english_set_hint():
+    rei = {"set": "EVA", "who": "Rei", "match": "Rei Ayanami", "cards": "UAPR/EVA-1-071 R"}
+    t = "PSA 10 Rei Ayanami Evangelion UAPR Japanese"
+    assert match.keep({**rei, "lang": "japanese"}, "psa", t, t + " Located in Japan")
+    assert not match.keep(rei, "psa", t, t)
+    for t in (
+        "PSA 10 Rei Ayanami Union Arena UA44ST Japanese",
+        "PSA 10 Rei Ayanami EX10BT Japanese",
+    ):
+        assert match.keep({**rei, "lang": "japanese"}, "psa", t, t), t
+
+
+def test_chinese_want_takes_chinese_titles_and_sellers():
+    w = {"set": "PKM", "who": "Sylveon", "q": "sylveon psa 10", "id": "sylveon", "lang": "chinese"}
+    t = "PSA 10 2026 Pokemon TCG Sylveon ex CSV9.5C-234/208 SAR Exclusive Chinese"
+    assert match.keep(w, "psa", t, t + " Located in Hong Kong")
+    assert not match.keep(w, "psa", "PSA 10 Sylveon ex SAR Japanese", "")
+    assert not match.keep(w, "psa", t, t + " Located in Japan")
+
+
+def test_psa_wants_take_psa_slabs_only():
+    for t in (
+        "TAG 10 Edward Elric 2 Star Union Arena (PSA 10 equivalent)",
+        "BGS 9.5 Edward Elric 2 Star Union Arena PSA 10 candidate",
+        "CGC 10 Pristine Edward Elric 2 Star Union Arena PSA 10",
+        "Edward Elric 2 Star Union Arena ACE 10 not PSA 10",
+        "TAG 9 Edward Elric 2 Star Union Arena PSA 10 candidate",
+        "TAG GEM MINT 10 Edward Elric 2 Star Union Arena PSA 10 equivalent",
+    ):
+        assert not match.keep(EDWARD, "psa", t, t), t
+    t = "PSA 10 Edward Elric 2 Star Union Arena"
+    assert match.keep(EDWARD, "psa", t, t)
+    ace = {"set": "FIN", "who": "Ace", "q": "ace psa 10", "id": "ace"}
+    assert match.keep(ace, "psa", "PSA 10 Ace Final Fantasy", "")  # a card named Ace
+    assert match.keep(ace, "psa", "Final Fantasy Ace Gem Mint PSA 10", "")
+    assert match.keep(ace, "psa", "Final Fantasy Ace Graded PSA 10", "")
+    assert match.keep(ace, "psa", "Final Fantasy Ace 10-131S PSA 10", "")  # a card number
+
+
+def test_japanese_wants_search_japanese_titles():
+    rei = {"set": "EVA", "who": "Rei", "match": "Rei Ayanami", "lang": "japanese", "raw": False}
+    assert "uapr" in match.searches(rei)[0][1]
+    assert "uapr" not in match.searches({**rei, "lang": None})[0][1]
+    eren = {"set": "AOT", "who": "x", "match": "Eren Yeager & Mikasa Ackerman", "lang": "japanese"}
+    q = match.searches(eren)[0][1]
+    assert len(q) <= 100 and "uapr" in q and "ue10bt" not in q  # the Browse API's limit
+
+
 def test_raw_must_be_ungraded_and_starred():
     assert match.keep(EDWARD, "raw", "Union Arena Edward Elric 2 star", "")
     assert not match.keep(EDWARD, "raw", "Union Arena Edward Elric 2 star BGS 9.5", "")
