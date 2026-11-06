@@ -16,6 +16,8 @@ A want is a dict (stored as JSON in the wants table). Keys, all optional except 
     refs      official-art filenames for the photo check
     cards     free-text card numbers ("011, 012 (1★, 2★)") used to find Union Arena refs
     pop       {"term": ..., "row": regex} picks this card's PSA pop rows
+    lang      "japanese" or "chinese": a print in that language, so titles and sellers naming it
+              count, and titles naming another language (English included) don't
 """
 
 from __future__ import annotations
@@ -25,7 +27,8 @@ import re
 import urllib.parse
 
 FOREIGN = re.compile(
-    r"japan|\bjp\b|\bjpn\b|japanese|chinese|korean|\bfrench\b|german|italian|ua\d\dbt|uapr|"
+    r"japan|\bjp\b|\bjpn\b|japanese|chinese|korean|\bfrench\b|german|italian|spanish|espa[nñ]ol|"
+    r"portugu[eê]s|\bthai\b|indonesian|ua\d\dbt|uapr|"
     r"ua37|ua44|ex\d\dbt|\bsao\b|proxy|custom|orica|fan ?art|playmat|sleeve",
     re.I,
 )
@@ -33,8 +36,24 @@ FOREIGN_SELLER = re.compile(
     r"(Located in|from) (Japan|Hong Kong|China|Korea|Taiwan|Germany|France|Italy|"
     r"Spain|Belgium|Netherlands|Australia|United Kingdom)"
 )
+# Japanese Union Arena codes: promos, boosters, starter decks (UA44ST) and expansions (EX10BT).
+JP_CODES = r"\buapr\b|\bua\d\d(?:bt|st)?\b|\bex\d\dbt\b"
+# Language markers in a title. English set codes: UE07BT, UEX07BT, UE07ST, UEPR.
+LANGS = {
+    "english": re.compile(r"english|\beng?\b|\b[u]ex?\d\d(?:bt|st)\b|\b[u]epr\b", re.I),
+    "japanese": re.compile(r"japan(?:ese)?|\bjpn?\b|" + JP_CODES, re.I),
+    "chinese": re.compile(r"chinese|simplified|\bcsv?\d", re.I),
+}
+# Where sellers of each language's cards are, as match.FOREIGN_SELLER names them.
+LANG_PLACES = {"japanese": ("Japan",), "chinese": ("China", "Hong Kong", "Taiwan")}
+# Graders other than PSA. ACE, TAG and ARS are also words, so they count only before a grade
+# ("TAG 9", "TAG GEM MINT 10"), never before a card number ("Ace 10-131S").
+OTHER_GRADER = re.compile(
+    r"\b(bgs|beckett|cgc|sgc|hga|[a]gs)\b"
+    r"|\b(tag|ace|ars)(?:\s+(?:grad\w*|gem|mint|pristine))*\s*\d{1,2}(?:\.5)?\b(?![-/.]\w)",
+    re.I,
+)
 GRADED = re.compile(r"\b(psa|bgs|cgc|tag|ace|beckett|sgc|ars)\b", re.I)
-OTHER_GRADER = re.compile(r"\b(bgs|cgc|beckett|sgc)\b", re.I)
 
 # Union Arena sets the character wants cover: eBay OR-words for the PSA search, the set name for raw
 # searches, and the title hint a listing must carry to count.
@@ -61,6 +80,7 @@ UA_SETS = {
     },
 }
 SET_HINT = {k: re.compile(v["hint"], re.I) for k, v in UA_SETS.items()}
+JP_UA_HINT = re.compile(JP_CODES, re.I)
 # A Union Arena print in the card list of a want, e.g. UE22BT/CSM-1-056_p1 (set, card id, parallel).
 PRINT_ID = re.compile(r"\b([A-Z0-9]+)/([A-Z]+-(?:\d-)?(?:\d{3}|AP\d{2})(?:_p\d)?)")
 # The card number a seller writes in a title, e.g. EVA-1-083 or CSM-1-AP03.
@@ -149,7 +169,10 @@ def searches(w: dict) -> list[tuple[str, str]]:
         return []
     name = w.get("match") or w["who"]
     ua = UA_SETS[w["set"]]
-    out = [("psa", f"{name} psa 10 {ua['words']}")]
+    words = ua["words"]
+    if w.get("lang") == "japanese":  # Japanese listings carry UAPR, not the English set codes
+        words = re.sub(r",[u]ex?\d\dbt", "", words)[:-1] + ",uapr,japanese)"
+    out = [("psa", f"{name} psa 10 {words}")]
     if w.get("raw", True):
         out.append(("raw", f"union arena {ua['raw']} {name} -psa -bgs -cgc -tag"))
     return out
@@ -173,7 +196,8 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
         if w.get(key) and not re.search(w[key], t, re.I):
             return False
     if w.get("set") in SET_HINT and not SET_HINT[w["set"]].search(t):
-        return False
+        if not (w.get("lang") == "japanese" and JP_UA_HINT.search(t)):
+            return False
     if w.get("set") in UA_SETS and w.get("cards"):
         # A title naming a card number the want doesn't list is another card (083, not 081/082).
         seen = {n.upper() for n in TITLE_NO.findall(title)}
@@ -187,15 +211,23 @@ def keep(w: dict, kind: str, title: str, text: str) -> bool:
                 return False
             if one[1] is not None and stated_stars(title) not in ("-", one[1]):
                 return False
-    if FOREIGN.search(t) or FOREIGN_SELLER.search(text):
+    t_foreign, text_foreign = t, text
+    lang = w.get("lang")
+    if lang in LANG_PLACES:  # a Japanese or Chinese print: its own language is not foreign
+        if any(rx.search(t) for name, rx in LANGS.items() if name != lang):
+            return False  # names another language: another print
+        t_foreign = LANGS[lang].sub(" ", t)
+        for place in LANG_PLACES[lang]:
+            text_foreign = text_foreign.replace(place, "")
+    if FOREIGN.search(t_foreign) or FOREIGN_SELLER.search(text_foreign):
         return False
     if w.get("set") == "DBS" and re.search(r"signed|autograph|\bauto\b|sabat|schemmel|nadolny", t):
         return False  # voice-actor autographs, not the printed Masters signature SPR
     if kind == "psa":
         if w.get("needstar") and stars(title) == "-":
             return False
-        if OTHER_GRADER.search(t):  # a CGC or BGS slab with "PSA 10" in the title for search
-            return False
+        if OTHER_GRADER.search(t):
+            return False  # PSA only: a CGC, BGS or "TAG 10, PSA 10 equivalent" slab
         return bool(re.search(r"psa ?10|psa gem", t))
     return not GRADED.search(t) and (bool(w.get("nostar")) or stars(title) != "-")
 
