@@ -341,19 +341,22 @@ def slab_check(db: DB, s: Settings, run_id: int) -> int:
             v = {"failed": dt.datetime.now().isoformat(timespec="seconds")}
         else:
             v["photo"] = art.get("photo") or ""
-        db.run(
-            "UPDATE listings SET slab = ? WHERE item_id = ? AND kind = ?",
-            json.dumps(v),
-            r["item_id"],
-            r["kind"],
-        )
         why = slab.wrong(v) if "failed" not in v else ""
+        with db.tx() as c:  # the read and the rejection together: a cached CGC read always drops
+            c.execute(
+                "UPDATE listings SET slab = ? WHERE item_id = ? AND kind = ?",
+                (json.dumps(v), r["item_id"], r["kind"]),
+            )
+            if why:
+                c.execute(
+                    "INSERT OR REPLACE INTO blocked (item_id, reason) VALUES (?, ?)",
+                    (r["item_id"], why),
+                )
+                c.execute(
+                    "UPDATE listings SET active = 0, deal = 0 WHERE item_id = ?", (r["item_id"],)
+                )
         if why:
             dropped += 1
-            db.run(
-                "INSERT OR REPLACE INTO blocked (item_id, reason) VALUES (?, ?)", r["item_id"], why
-            )
-            db.run("UPDATE listings SET active = 0, deal = 0 WHERE item_id = ?", r["item_id"])
             log.info("listing %s dropped: %s", r["item_id"], why)
     return dropped
 
