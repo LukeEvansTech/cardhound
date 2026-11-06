@@ -21,7 +21,7 @@
   <form class="snipe" method="post" action="/deal/{{ r.item_id }}/{{ r.kind }}/gixen">
     <input type="hidden" name="maxbid" value="{{ '%.2f' | format(r.bid_to) }}">
     <input type="hidden" name="back" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}">
-    <button type="submit">Snipe on Gixen up to {{ r.bid_to | money }}</button>
+    <button class="snipe-btn" type="submit">Snipe on Gixen up to {{ r.bid_to | money }}</button>
   </form>
   {% endif %}
   {% endif %}

@@ -5,11 +5,10 @@ import urllib.parse
 
 import pytest
 from fastapi.testclient import TestClient
-from test_web import ROW, FakeBrowser
-
 from sleeper import config, gixen, match, slab, sweep
 from sleeper.db import DB
 from sleeper.web import create_app
+from test_web import ROW, FakeBrowser
 
 
 @pytest.fixture(autouse=True)
@@ -61,7 +60,7 @@ def test_snipe_goes_to_gixen_and_is_remembered(env, monkeypatch):
     _, db, client = env
     asked = []
 
-    def urlopen(req, timeout=0):
+    def urlopen(req, **_k):
         asked.append(urllib.parse.parse_qs(urllib.parse.urlsplit(req.full_url).query))
         return _Answer(b"<br />OK 111 ADDED")
 

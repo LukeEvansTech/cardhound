@@ -1359,7 +1359,7 @@ kbd {
   padding: 0 12px 12px;
 }
 
-.snipe button {
+.snipe-btn {
   width: 100%;
   min-height: 36px;
   font-size: 0.82rem;
@@ -1389,6 +1389,6 @@ kbd {
   align-items: center;
 }
 
-.snipe-form input {
+.snipe-bid {
   width: 8rem;
 }
