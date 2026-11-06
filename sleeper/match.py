@@ -139,7 +139,8 @@ def stars(title: str) -> str:
         return "3"
     if re.search(r"2 ?stars?|★★|☆☆|sr\*\*|signature", t):
         return "2"
-    if re.search(r"1 ?star|alt(ernate)? ?art|parallel|★|☆|\*", t):
+    # "*" only next to a rarity ("SR*", "R*"): sellers also use it as a separator ("Lust * SR * NM").
+    if re.search(r"1 ?star|alt(ernate)? ?art|parallel|★|☆|\b(?:ur|sr|r|u|c)\*", t):
         return "1"
     return "-"
 
